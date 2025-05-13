@@ -24,7 +24,7 @@ const HeroSection = () => {
 
       {/* Right side - Content */}
       <div className="w-full md:w-1/2 space-y-10">
-        <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold">
+        <h1 className="text-center md:text-left text-4xl lg:text-5xl font-bold">
           First Ever <span className="text-[#0C8B44]">Road Test</span>
           <br />
           <Image 
@@ -50,7 +50,7 @@ const HeroSection = () => {
             </div>
             <div>
               <p className="font-medium">
-                <span className="text-[#0C8B44]">Hassle-Free Online Booking</span> –
+                <span className="text-[#0C8B44]">Hassle-Free Online Booking</span>
               </p>
               <p className="text-sm text-gray-700">
                 Reserve your car in minutes with a seamless process.
@@ -69,7 +69,7 @@ const HeroSection = () => {
             </div>
             <div>
               <p className="font-medium">
-                <span className="text-[#0C8B44]">Road-test-ready vehicles</span> –
+                <span className="text-[#0C8B44]">Road-test-ready vehicles</span>
               </p>
               <p className="text-sm text-gray-700">
                 Well-maintained and Test-approved vehicle for your test.
@@ -88,7 +88,7 @@ const HeroSection = () => {
             </div>
             <div>
               <p className="font-medium">
-                <span className="text-[#0C8B44]">Same Car, Better Value</span> –
+                <span className="text-[#0C8B44]">Same Car, Better Value</span>
               </p>
               <p className="text-sm text-gray-700">
                 {"Drive the same instructor's car, but at a lower price."}
@@ -105,7 +105,7 @@ const HeroSection = () => {
             </div>
             <div>
               <p className="font-medium">
-                <span className="text-[#0C8B44]">Local Business</span> –
+                <span className="text-[#0C8B44]">Local Business</span>
               </p>
               <p className="text-sm text-gray-700">
                 Elan is completely Canadian owned and operated.
@@ -116,7 +116,7 @@ const HeroSection = () => {
 
         {/* Call-to-action buttons */}
         <div className="flex flex-wrap gap-4 pt-2">
-          <Link href="/book-now">
+          <Link href="/book-road-test-vehicle/road-test-details">
             <Button 
               size="lg" 
               className="bg-[#0C8B44] hover:bg-[#0C8B44]/90 text-white font-medium"

@@ -15,7 +15,7 @@ import {
 
 const Navbar = () => {
   return (
-    <div className="w-full border-b">
+    <div className="w-full border-b sticky top-0 bg-white z-50">
       {/* Announcement banner */}
       <div className="w-full bg-[#0C8B44] text-white text-center py-2 text-sm">
         Get a $50 coupon with your first test ride book. Offer ends March 13, 2025. 
@@ -39,12 +39,12 @@ const Navbar = () => {
         
         {/* Navigation links */}
         <div className="hidden md:flex items-center space-x-8">
-          <Link href="/how-it-works" className="text-sm font-medium">
+          <Link href="/how-it-works" className="text-sm font-medium hover:text-[#0C8B44]">
             How It Works
           </Link>
           
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center text-sm font-medium">
+            <DropdownMenuTrigger className="flex items-center text-sm font-medium cursor-pointer hover:text-[#0C8B44]">
               Our Locations <ChevronDown className="ml-1 h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" className="w-48">
@@ -58,13 +58,13 @@ const Navbar = () => {
             </DropdownMenuContent>
           </DropdownMenu>
           
-          <Link href="/contact-us" className="text-sm font-medium">
+          <Link href="/contact-us" className="text-sm font-medium hover:text-[#0C8B44]">
             Contact Us
           </Link>
-          <Link href="/faq" className="text-sm font-medium">
+          <Link href="/faq" className="text-sm font-medium hover:text-[#0C8B44]">
             FAQ
           </Link>
-          <Link href="/blogs" className="text-sm font-medium">
+          <Link href="https://blog.elanroadtestrental.ca/" className="text-sm font-medium hover:text-[#0C8B44]">
             Blogs
           </Link>
         </div>
