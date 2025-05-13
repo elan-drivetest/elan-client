@@ -23,6 +23,7 @@ export default function Confirmation() {
     calculatePricing();
   }, [setCurrentStep, calculatePricing]);
   
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleApplyPromo = (code: string) => {
     console.log("Promo application disabled on confirmation page");
   };

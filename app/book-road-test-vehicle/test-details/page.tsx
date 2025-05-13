@@ -35,7 +35,9 @@ export default function TestDetails() {
   const [selectedAddOn, setSelectedAddOn] = useState<AddOnType>(
     bookingState.selectedAddOn || null
   );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [roadTestFile, setRoadTestFile] = useState<File | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [licenseFile, setLicenseFile] = useState<File | null>(null);
   
   // Set current step and make sure pricing is calculated correctly
