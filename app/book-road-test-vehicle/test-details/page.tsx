@@ -45,6 +45,7 @@ export default function TestDetails() {
     setCurrentStep(3);
     // Calculate initial pricing
     calculatePricing();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setCurrentStep]);
   
   // Update pricing when relevant booking state changes
