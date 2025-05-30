@@ -165,7 +165,7 @@ export default function Profile() {
                 <div className="border border-gray-200 rounded-lg p-6">
                   <div className="mb-4 flex gap-2">
                     <div className="w-6 h-6 bg-[#0C8B44] rounded-full flex items-center justify-center text-white text-xs">
-                      1
+                      2
                     </div>
                     <div>
                       <div className="font-medium">Upload Your G1 License</div>

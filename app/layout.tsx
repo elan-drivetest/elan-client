@@ -4,6 +4,7 @@ import { IBM_Plex_Sans_JP, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import { AuthProvider } from "@/lib/context/AuthContext";
 
 // Configure IBM Plex Sans JP font
 const ibmPlexSansJP = IBM_Plex_Sans_JP({
@@ -33,9 +34,11 @@ export default function RootLayout({
       <body
         className={`${ibmPlexSansJP.variable} ${geistMono.variable} antialiased`}
       >
-        <Navbar />
-        {children}
-        <Footer />
+        <AuthProvider>
+          <Navbar />
+          {children}
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   );

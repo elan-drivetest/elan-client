@@ -2,7 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { FaTiktok, FaFacebookF, FaInstagram, FaYoutube, FaTwitter } from "react-icons/fa6";
+import { FaTiktok, FaFacebookF, FaInstagram, FaYoutube } from "react-icons/fa6";
 
 const Footer = () => {
   return (
@@ -66,21 +66,21 @@ const Footer = () => {
           
           {/* Social media icons */}
           <div className="md:col-span-3">
-            <h3 className="font-medium text-sm text-[#0C8B44] mb-4">Customers</h3>
+            <h3 className="font-medium text-sm text-[#0C8B44] mb-4">Socials</h3>
             <div className="flex space-x-4">
-              <Link href="https://facebook.com" aria-label="Facebook" className="text-gray-600 hover:text-[#0C8B44]">
+              <Link href="https://www.facebook.com/elanroadtestrental" aria-label="Facebook" className="text-gray-600 hover:text-[#0C8B44]">
                 <FaFacebookF size={20} />
               </Link>
-              <Link href="https://instagram.com" aria-label="Instagram" className="text-gray-600 hover:text-[#0C8B44]">
+              <Link href="https://www.instagram.com/elanroadtestrental" aria-label="Instagram" className="text-gray-600 hover:text-[#0C8B44]">
                 <FaInstagram size={20} />
               </Link>
-              <Link href="https://twitter.com" aria-label="Twitter" className="text-gray-600 hover:text-[#0C8B44]">
+              {/* <Link href="https://twitter.com" aria-label="Twitter" className="text-gray-600 hover:text-[#0C8B44]">
                 <FaTwitter size={20} />
-              </Link>
-              <Link href="https://youtube.com" aria-label="YouTube" className="text-gray-600 hover:text-[#0C8B44]">
+              </Link> */}
+              <Link href="https://www.youtube.com/@GrayJaysDrivingSchool" aria-label="YouTube" className="text-gray-600 hover:text-[#0C8B44]">
                 <FaYoutube size={20} />
               </Link>
-              <Link href="https://youtube.com" aria-label="YouTube" className="text-gray-600 hover:text-[#0C8B44]">
+              <Link href="https://www.tiktok.com/@elanroadtestcarsolutions" aria-label="YouTube" className="text-gray-600 hover:text-[#0C8B44]">
                 <FaTiktok size={20} />
               </Link>
             </div>

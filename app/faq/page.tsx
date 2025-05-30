@@ -59,10 +59,10 @@ export default function FAQPage() {
             <Accordion type="single" collapsible className="w-full">
               {category.questions.map((faq, faqIndex) => (
                 <AccordionItem key={faqIndex} value={`item-${faqIndex}`} className="border-b border-gray-200">
-                  <AccordionTrigger className="text-left font-medium py-4 hover:text-[#0C8B44] hover:no-underline">
+                  <AccordionTrigger className="text-left text-xl py-4 hover:text-[#0C8B44] hover:no-underline">
                     {faq.question}
                   </AccordionTrigger>
-                  <AccordionContent className="text-gray-600 pb-4">
+                  <AccordionContent className="text-gray-600 text-xl pb-4">
                     {faq.answer}
                   </AccordionContent>
                 </AccordionItem>

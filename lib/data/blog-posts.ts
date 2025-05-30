@@ -11,7 +11,7 @@ export const blogPosts = [
     id: 2,
     title: "How to Pass Your G2 Drive-Test on the First Try (Short Guide for Ontario Drivers)",
     excerpt: "Get tips and tricks to ace your G2 driving test in Ontario with our comprehensive guide.",
-    imageSrc: "https://blog.elanroadtestrental.ca/_next/image?url=%2Fimages%2Fblog-12%2Fimage1.jpg&w=1920&q=75",
+    imageSrc: "https://blog.elanroadtestrental.ca/_next/image?url=%2Fimages%2Fblog-12%2Fimage1.png&w=1920&q=75",
     slug: "https://blog.elanroadtestrental.ca/posts/How-to-Pass-Your-G2-Drive-Test-on-the-First-Try-(Short-Guide-for-Ontario-Drivers)",
   },
   {

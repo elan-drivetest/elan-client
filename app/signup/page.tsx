@@ -3,14 +3,18 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormInput } from "@/components/ui/form-input";
 import { Separator } from "@/components/ui/separator";
+import { authApi, handleApiError, validateRegistrationData } from "@/lib/api";
+import type { RegisterRequest } from "@/lib/types/auth.types";
 
 export default function SignupPage() {
-  const [formData, setFormData] = useState({
+  const router = useRouter();
+  const [formData, setFormData] = useState<RegisterRequest>({
     email: "",
     phone: "",
-    fullName: "",
+    full_name: "",
     password: "",
     confirmPassword: "",
     marketing: true
@@ -19,18 +23,22 @@ export default function SignupPage() {
   const [errors, setErrors] = useState({
     email: "",
     phone: "",
-    fullName: "",
+    full_name: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    general: ""
   });
   
   const [touched, setTouched] = useState({
     email: false,
     phone: false,
-    fullName: false,
+    full_name: false,
     password: false,
     confirmPassword: false
   });
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   
   const validateField = (name: string, value: string) => {
     switch (name) {
@@ -38,9 +46,10 @@ export default function SignupPage() {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(value) ? "" : "Please enter a valid email";
       case "phone":
-        const phoneRegex = /^\d{10}$/;
-        return phoneRegex.test(value) ? "" : "Please enter a valid 10-digit phone number";
-      case "fullName":
+        if (!value.trim()) return ""; // Optional field
+        const phoneRegex = /^\+?[\d\s\-()]+$/;
+        return phoneRegex.test(value) ? "" : "Please enter a valid phone number";
+      case "full_name":
         return value.trim().length > 0 ? "" : "Please enter your full name";
       case "password":
         return value.length >= 8 ? "" : "Password must be at least 8 characters";
@@ -58,6 +67,11 @@ export default function SignupPage() {
       [name]: type === "checkbox" ? checked : value
     });
     
+    // Clear general error when user starts typing
+    if (errors.general) {
+      setErrors(prev => ({ ...prev, general: "" }));
+    }
+    
     if (touched[name as keyof typeof touched]) {
       setErrors({
         ...errors,
@@ -65,7 +79,7 @@ export default function SignupPage() {
       });
     }
     
-    // Special case for confirmPassword
+    // Special case for confirmPassword when password changes
     if (name === "password" && touched.confirmPassword) {
       setErrors({
         ...errors,
@@ -86,37 +100,123 @@ export default function SignupPage() {
     });
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate all fields
-    const newErrors = {
-      email: validateField("email", formData.email),
-      phone: validateField("phone", formData.phone),
-      fullName: validateField("fullName", formData.fullName),
-      password: validateField("password", formData.password),
-      confirmPassword: validateField("confirmPassword", formData.confirmPassword)
+    // Prepare data for API (map form fields to API fields)
+    const apiData: RegisterRequest = {
+      full_name: formData.full_name,
+      email: formData.email,
+      password: formData.password,
+      phone_number: typeof formData.phone === 'string' ? formData.phone.trim() : undefined,
+      confirmPassword: "",
+      phone: undefined,
+      marketing: undefined
     };
     
-    setErrors(newErrors);
+    // Validate all fields
+    const clientValidation = validateRegistrationData(apiData);
+    const confirmPasswordError = validateField("confirmPassword", formData.confirmPassword);
+    
+    const newErrors = {
+      ...clientValidation.errors,
+      confirmPassword: confirmPasswordError,
+      general: ""
+    };
+    
+    setErrors(prevErrors => ({
+      ...prevErrors,
+      ...newErrors
+    }));
     setTouched({
       email: true,
       phone: true,
-      fullName: true,
+      full_name: true,
       password: true,
       confirmPassword: true
     });
     
-    // Check if there are any errors
-    if (Object.values(newErrors).some(error => error !== "")) {
-      console.log("Form has errors");
+    // Check if there are any validation errors
+    if (!clientValidation.isValid || confirmPasswordError) {
       return;
     }
     
-    // Form is valid, proceed with submission
-    console.log("Form submitted:", formData);
-    // Add your API call or form submission logic here
+    setIsLoading(true);
+    
+    try {
+      const result = await authApi.register(apiData);
+      
+      if (result.success) {
+        // Registration successful - show success message
+        setShowSuccess(true);
+        // Optional: redirect to login page after a delay
+        setTimeout(() => {
+          router.push("/login");
+        }, 3000);
+      } else {
+        // Handle API errors
+        const errorMessage = handleApiError(result.error);
+        setErrors(prev => ({
+          ...prev,
+          general: errorMessage
+        }));
+      }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
+      // Handle unexpected errors
+      setErrors(prev => ({
+        ...prev,
+        general: "An unexpected error occurred. Please try again."
+      }));
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Success state
+  if (showSuccess) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-xl w-full space-y-8 text-center">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-8">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-green-900 mb-4">
+              Registration Successful!
+            </h2>
+            <p className="text-green-700 mb-6">
+              {"Thank you for signing up! We've sent a verification email to"} <strong>{formData.email}</strong>. 
+              Please check your inbox and click the verification link to activate your account.
+            </p>
+            <p className="text-sm text-green-600">
+              Redirecting to login page in a few seconds...
+            </p>
+          </div>
+          
+          <div className="space-y-4">
+            <Link href="/login">
+              <button className="w-full py-2 px-4 bg-[#0C8B44] hover:bg-[#0A7A3C] text-white rounded-md font-medium transition-colors">
+                Go to Login Page
+              </button>
+            </Link>
+            
+            <p className="text-sm text-gray-600">
+              {"Didn't receive the email?"}{" "}
+              <button 
+                onClick={() => authApi.resendConfirmation(formData.email)}
+                className="text-[#0C8B44] hover:underline font-medium"
+              >
+                Resend verification email
+              </button>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -128,6 +228,13 @@ export default function SignupPage() {
         </div>
         
         <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+          {/* General error message */}
+          {errors.general && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <p className="text-sm text-red-600">{errors.general}</p>
+            </div>
+          )}
+          
           {/* Email */}
           <FormInput
             label="Email"
@@ -150,8 +257,7 @@ export default function SignupPage() {
             name="phone"
             type="tel"
             placeholder="Phone Number"
-            required
-            value={formData.phone}
+            value={formData.phone as string}
             onChange={handleChange}
             onBlur={handleBlur}
             error={errors.phone}
@@ -162,16 +268,16 @@ export default function SignupPage() {
           {/* Full Name */}
           <FormInput
             label="Full Name"
-            id="fullName"
-            name="fullName"
+            id="full_name"
+            name="full_name"
             type="text"
             placeholder="Full Name"
             required
-            value={formData.fullName}
+            value={formData.full_name}
             onChange={handleChange}
             onBlur={handleBlur}
-            error={errors.fullName}
-            showError={touched.fullName && !!errors.fullName}
+            error={errors.full_name}
+            showError={touched.full_name && !!errors.full_name}
           />
           
           {/* Password */}
@@ -227,9 +333,10 @@ export default function SignupPage() {
           <div>
             <button
               type="submit"
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#0C8B44] hover:bg-[#0A7A3C] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0C8B44]"
+              disabled={isLoading}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#0C8B44] hover:bg-[#0A7A3C] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0C8B44] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create account
+              {isLoading ? "Creating account..." : "Create account"}
             </button>
           </div>
         </form>
