@@ -1,14 +1,14 @@
-// File path: app/book-road-test-vehicle/payment/page.tsx
-
+// app/book-road-test-vehicle/payment/page.tsx
 "use client"
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/context/BookingContext";
+import { useAuth } from "@/lib/context/AuthContext";
 import BookingStepsProgress from "@/components/booking/BookingStepsProgress";
 import TestSummary from "@/components/booking/TestSummary";
 import PickupOptions from "@/components/booking/PickupOptions";
-import { CheckCircle, CreditCard, FileText } from "lucide-react";
+import { CheckCircle, CreditCard, FileText, AlertTriangle, Loader2 } from "lucide-react";
 
 const bookingSteps = [
   { id: 1, name: "Road Test Details", path: "/book-road-test-vehicle/road-test-details" },
@@ -19,50 +19,231 @@ const bookingSteps = [
 
 export default function Payment() {
   const router = useRouter();
-  const { bookingState, setCurrentStep, calculatePricing } = useBooking();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const { user, isAuthenticated } = useAuth();
+  const { 
+    bookingState, 
+    setCurrentStep, 
+    calculatePricing,
+    updateBookingState,
+    createBooking,
+    validateBookingData
+  } = useBooking();
   
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Set current step and calculate pricing ONCE - fix infinite re-rendering
   useEffect(() => {
     setCurrentStep(4);
-    calculatePricing();
-  }, [setCurrentStep, calculatePricing]);
-  
-  // Redirect if necessary fields aren't set
+    if (calculatePricing) {
+      calculatePricing();
+    }
+  }, []); // Empty dependency array to prevent infinite loops
+
+  // Auto-populate user details from authenticated user - ONCE per auth change
   useEffect(() => {
-    if (!bookingState.userDetails?.email) {
+    if (isAuthenticated && user && !bookingState.userDetails?.email) {
+      const userDetails = {
+        fullName: user.full_name || '',
+        email: user.email,
+        phone: user.phone_number || ''
+      };
+      
+      // Only update if the data is actually different
+      const currentUserDetails = bookingState.userDetails;
+      const hasChanged = !currentUserDetails || 
+        currentUserDetails.fullName !== userDetails.fullName ||
+        currentUserDetails.email !== userDetails.email ||
+        currentUserDetails.phone !== userDetails.phone;
+        
+      if (hasChanged) {
+        updateBookingState({ userDetails });
+      }
+    }
+  }, [isAuthenticated, user?.full_name, user?.email, user?.phone_number]); // Depend on specific user properties
+
+  // Redirect if necessary fields aren't set - run only once on mount and when auth changes
+  useEffect(() => {
+    if (!bookingState.userDetails?.email && !isAuthenticated) {
       router.push("/book-road-test-vehicle/booking-details");
     }
-  }, [bookingState, router]);
-  
+  }, [isAuthenticated]); // Only depend on auth status, not bookingState
+
   const handleApplyPromo = (code: string) => {
     console.log("Applying promo code:", code);
     alert(`Promo code ${code} applied!`);
   };
-  
-  const handlePaymentSubmit = () => {
+
+  const handlePaymentSubmit = async () => {
+    // Clear any previous booking errors first
+    updateBookingState({ bookingError: undefined });
+    
+    // Validate data before submission using BookingContext validation
+    const validation = validateBookingData();
+    if (!validation.isValid) {
+      alert(`Please fix the following issues:\n${validation.errors.join('\n')}`);
+      return;
+    }
+
     setIsProcessing(true);
     
-    // Log all form data
-    console.log("Submitting payment with the following booking data:", bookingState);
-    
-    // Simulate payment processing
-    setTimeout(() => {
-      setIsProcessing(false);
+    try {
+      console.log("🚀 Creating booking with data:", bookingState);
       
-      // Redirect to confirmation page
-      router.push("/book-road-test-vehicle/confirmation");
-    }, 2000);
+      // Use the BookingContext createBooking method
+      const result = await createBooking();
+      
+      console.log("📊 Full API response:", result);
+      
+      if (result.success) {
+        console.log("✅ Booking created successfully");
+        
+        // Check if result.data is a string (the Stripe URL directly)
+        if (typeof result.data === 'string' && result.data.includes('checkout.stripe.com')) {
+          console.log("💳 Redirecting to Stripe checkout (string response):", result.data);
+          // Redirect to Stripe checkout
+          window.location.href = result.data;
+          return;
+        }
+        
+        // Check if result.data is an object with checkout_url
+        if (result.data && typeof result.data === 'object' && result.data.checkout_url) {
+          console.log("💳 Redirecting to Stripe checkout (object response):", result.data.checkout_url);
+          // Redirect to Stripe checkout
+          window.location.href = result.data.checkout_url;
+          return;
+        }
+        
+        // If no Stripe URL found, log what we got
+        console.log("⚠️ No Stripe checkout URL found");
+        console.log("🔍 Response type:", typeof result.data);
+        console.log("🔍 Response data:", result.data);
+        
+        if (result.data && typeof result.data === 'object') {
+          console.log("🔍 Available keys in result.data:", Object.keys(result.data));
+        }
+        
+        // Fallback to original confirmation page
+        router.push("/book-road-test-vehicle/confirmation");
+      } else {
+        console.error("❌ Booking creation failed:", result.error);
+        alert(`Booking failed: ${result.error}`);
+      }
+      
+    } catch (error) {
+      console.error("💥 Payment submission error:", error);
+      alert('Network error occurred. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
-  
-  // Mock document details
-  const g2DocsFile = bookingState.documents?.roadTestFile || "G2_Docs.pdf";
-  const licenseFile = bookingState.documents?.licenseFile || "G1_License.pdf";
-  
+
+  // Initialize component state once
+  useEffect(() => {
+    const initializeComponent = () => {
+      updateBookingState({ 
+        bookingError: undefined,
+        isCreatingBooking: false
+      });
+    };
+    
+    initializeComponent();
+  }, []); // Run only once on mount
+
+  // Helper function to truncate file name
+  const truncateFileName = (fileName: string, maxLength: number = 25): string => {
+    if (!fileName) return "";
+    if (fileName.length <= maxLength) return fileName;
+    
+    const extension = fileName.split('.').pop();
+    const nameWithoutExtension = fileName.substring(0, fileName.lastIndexOf('.'));
+    const truncatedName = nameWithoutExtension.substring(0, maxLength - extension!.length - 4) + "...";
+    
+    return `${truncatedName}.${extension}`;
+  };
+
+  // Helper function to format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Get file details from booking state
+  const getRoadTestFileDetails = () => {
+    // Check for uploaded file metadata first
+    const uploadedUrl = bookingState.documents?.roadTestFile;
+    const originalFileName = bookingState.documents?.roadTestFileMetadata?.originalName;
+    const fileSize = bookingState.documents?.roadTestFileMetadata?.size;
+    
+    if (uploadedUrl && originalFileName) {
+      return {
+        name: truncateFileName(originalFileName),
+        size: fileSize ? formatFileSize(fileSize) : "Unknown size"
+      };
+    }
+    
+    // Fallback to legacy file name storage
+    const legacyFileName = bookingState.documents?.roadTestFile;
+    if (typeof legacyFileName === 'string') {
+      return {
+        name: truncateFileName(legacyFileName),
+        size: "Unknown size"
+      };
+    }
+    
+    return {
+      name: "G2_Docs.pdf",
+      size: "0.53 MB"
+    };
+  };
+
+  const getLicenseFileDetails = () => {
+    // Check for uploaded file metadata first
+    const uploadedUrl = bookingState.documents?.licenseFile;
+    const originalFileName = bookingState.documents?.licenseFileMetadata?.originalName;
+    const fileSize = bookingState.documents?.licenseFileMetadata?.size;
+    
+    if (uploadedUrl && originalFileName) {
+      return {
+        name: truncateFileName(originalFileName),
+        size: fileSize ? formatFileSize(fileSize) : "Unknown size"
+      };
+    }
+    
+    // Fallback to legacy file name storage
+    const legacyFileName = bookingState.documents?.licenseFile;
+    if (typeof legacyFileName === 'string') {
+      return {
+        name: truncateFileName(legacyFileName),
+        size: "Unknown size"
+      };
+    }
+    
+    return {
+      name: "G1_License.pdf",
+      size: "0.76 MB"
+    };
+  };
+
+  // Get dynamic file details
+  const roadTestFile = getRoadTestFileDetails();
+  const licenseFile = getLicenseFileDetails();
+
   // Create formatted start date
   const formattedStartDate = bookingState.testDate && bookingState.testTime
     ? `${bookingState.testDate} at ${bookingState.testTime}`
     : "Monday, April 7, 2025 at 10:00 am";
-  
+
+  // Check if all required data is available
+  const hasRequiredDocuments = bookingState.documents?.roadTestFile && 
+                               bookingState.documents?.licenseFile;
+  const canSubmitBooking = hasRequiredDocuments && 
+                          (isAuthenticated || bookingState.userDetails?.email);
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <BookingStepsProgress steps={bookingSteps} />
@@ -72,20 +253,34 @@ export default function Payment() {
           <h1 className="text-2xl font-bold mb-1">We are almost done!</h1>
           <p className="text-gray-600 mb-6">Please check your road test details and summary.</p>
           
+          {/* Validation Errors */}
+          {bookingState.bookingError && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="text-sm font-medium text-red-800 mb-2">
+                    Booking Error:
+                  </h3>
+                  <p className="text-sm text-red-700">{bookingState.bookingError}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* Test Type and Contact Details */}
           <div className="mb-8 grid grid-cols-2 gap-4">
             <div>
-              <h3 className="text-sm font-medium mb-1">Road Test Type</h3>
-              <div className="text-sm">{bookingState.testType || "G2"}</div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium mb-1">Contact Details</h3>
+              <h3 className="text-sm font-medium mb-1 text-primary">Contact Details</h3>
               <div className="text-sm">
-                <p>{bookingState.userDetails?.fullName || "Toridul Islam Chayan"}</p>
-                <p>{bookingState.userDetails?.email || "toridul@gmail.com"}</p>
-                <p>{bookingState.userDetails?.phone || "+1 647 676 4519"}</p>
+                <p>{bookingState.userDetails?.fullName || ""}</p>
+                <p>{bookingState.userDetails?.email || ""}</p>
+                <p>{bookingState.userDetails?.phone || ""}</p>
               </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium mb-1 text-primary">Road Test Type</h3>
+              <div className="text-sm">{bookingState.testType || "G2"}</div>
             </div>
           </div>
           
@@ -112,8 +307,8 @@ export default function Payment() {
                   </div>
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{g2DocsFile}</p>
-                  <p className="text-xs text-gray-500">0.53 MB</p>
+                  <p className="text-sm font-medium">{roadTestFile.name}</p>
+                  <p className="text-xs text-gray-500">{roadTestFile.size}</p>
                 </div>
               </div>
               
@@ -124,8 +319,8 @@ export default function Payment() {
                   </div>
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{licenseFile}</p>
-                  <p className="text-xs text-gray-500">0.76 MB</p>
+                  <p className="text-sm font-medium">{licenseFile.name}</p>
+                  <p className="text-xs text-gray-500">{licenseFile.size}</p>
                 </div>
               </div>
             </div>
@@ -134,11 +329,31 @@ export default function Payment() {
           {/* Continue to Payment Button */}
           <button
             onClick={handlePaymentSubmit}
-            disabled={isProcessing}
-            className="w-full py-3 bg-[#0C8B44] hover:bg-[#0A7A3C] text-white rounded-md font-medium transition-colors mb-8"
+            disabled={!canSubmitBooking || isProcessing || bookingState.isCreatingBooking}
+            className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-md font-medium transition-colors mb-8 ${
+              canSubmitBooking && !isProcessing && !bookingState.isCreatingBooking
+                ? 'bg-[#0C8B44] hover:bg-[#0A7A3C] text-white' 
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
           >
-            {isProcessing ? "Processing..." : "Continue to Payment"}
+            {(isProcessing || bookingState.isCreatingBooking) ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              "Continue to Payment"
+            )}
           </button>
+          
+          {!canSubmitBooking && !isProcessing && (
+            <p className="text-sm text-gray-500 text-center mb-8">
+              {!hasRequiredDocuments 
+                ? "Please upload all required documents to continue"
+                : "Please sign in to continue"
+              }
+            </p>
+          )}
           
           {/* Pickup Options */}
           <PickupOptions />
@@ -152,8 +367,8 @@ export default function Payment() {
             vehicleModel="Lexus UX or Similar"
             vehicleFeatures={["Gas", "5 seats", "Automatic"]}
             startDate={formattedStartDate}
-            testCentre={bookingState.testCenter || "Road Test Centre"}
-            testCentreAddress={bookingState.testCenterAddress || "5555 Eglinton Ave W Etobicoke ON M9C 5M1"}
+            testCentre={typeof bookingState.testCenter === 'object' ? bookingState.testCenter?.name ?? "" : bookingState.testCenter ?? ""}
+            testCentreAddress={bookingState.testCenterAddress}
             onApplyPromo={handleApplyPromo}
             hasAddOn={!!bookingState.selectedAddOn}
             selectedAddOn={bookingState.selectedAddOn || null}
@@ -163,11 +378,3 @@ export default function Payment() {
     </div>
   );
 }
-
-
-
-
-
-
-
-

@@ -1,19 +1,25 @@
+// lib/api.ts - Updated to include booking services
 import axios, { AxiosError } from 'axios';
-import type {
-  RegisterRequest,
-  LoginRequest,
-  UserProfile,
-  UpdateProfileRequest,
-  ApiResponse,
-  ApiError,
-  ValidationResult
+import type { 
+  RegisterRequest, 
+  LoginRequest, 
+  UserProfile, 
+  ApiResponse, 
+  ApiError, 
+  UpdateProfileRequest 
 } from '@/lib/types/auth.types';
 
-// Create axios instance with base configuration
+// Import booking service and types
+import { bookingService } from '@/lib/services/booking.service';
+import type {
+  Addon,
+  Coupon,
+  CreateBookingRequest} from '@/lib/types/booking.types';
+
+// Create the main API client
 const api = axios.create({
   baseURL: 'https://api-dev.elanroadtestrental.ca/v1',
-  timeout: 10000,
-  withCredentials: true, // Essential for cookie handling
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -22,29 +28,15 @@ const api = axios.create({
 // Request interceptor for debugging and cookie handling
 api.interceptors.request.use(
   (config) => {
-    console.log('API Request:', config.method?.toUpperCase(), config.baseURL ? config.baseURL + config.url : 'BaseURL or URL is undefined');
+    console.log('🌐 API Request:', config.method?.toUpperCase(), config.url);
     
-    // Ensure withCredentials is set
+    // Ensure withCredentials is set for cross-domain cookies
     config.withCredentials = true;
-    // Log cookies being sent (for debugging)
-    if (typeof window !== 'undefined') {
-      const cookies = document.cookie;
-      console.log('🍪 Cookies being sent:', cookies);
-      
-      // Manually extract and add auth cookies if they exist
-      const authCookie = getCookieValue('_elanAuth');
-      const authRefreshCookie = getCookieValue('_elanAuthR');
-      
-      if (authCookie && authRefreshCookie) {
-        // Ensure cookies are being sent
-        config.headers.Cookie = `_elanAuth=${authCookie}; _elanAuthR=${authRefreshCookie}`;
-        console.log('🔐 Auth cookies found and added to request');
-      }
-    }
     
     return config;
   },
   (error: AxiosError) => {
+    console.error('❌ Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
@@ -52,84 +44,89 @@ api.interceptors.request.use(
 // Response interceptor for handling common errors and cookie debugging
 api.interceptors.response.use(
   (response) => {
-    // Enhanced cookie debugging
+    // Log successful responses
     const setCookieHeader = response.headers['set-cookie'];
     if (setCookieHeader) {
       console.log('🍪 Response set-cookie header:', setCookieHeader);
-      
-      // Check if our auth cookies are being set
-      const hasAuthCookie = setCookieHeader.some(cookie => cookie.includes('_elanAuth'));
-      const hasRefreshCookie = setCookieHeader.some(cookie => cookie.includes('_elanAuthR'));
-      
-      console.log('🔍 Auth cookies in response:', {
-        _elanAuth: hasAuthCookie,
-        _elanAuthR: hasRefreshCookie
-      });
-    } else {
-      console.log('⚠️ No set-cookie header in response');
     }
-    
-    // Log all response headers for debugging
-    console.log('📋 All response headers:', response.headers);
     
     return response;
   },
-  (error: AxiosError) => {
-    // Log errors but don't automatically redirect
-    console.log('API Error:', error.response?.status, error.response?.data);
+  async (error: AxiosError) => {
+    console.log('❌ API Error:', error.response?.status, error.response?.data);
+    
+    // Handle 401 unauthorized errors - but NOT for login and getCurrentUser endpoints
+    if (error.response?.status === 401) {
+      const isLoginEndpoint = error.config?.url?.includes('/login');
+      const isGetUserEndpoint = error.config?.url?.includes('/auth/customer/me');
+      const isRefreshEndpoint = error.config?.url?.includes('/refresh');
+      
+      // Don't redirect on login, getCurrentUser, or refresh endpoints
+      if (isLoginEndpoint || isGetUserEndpoint || isRefreshEndpoint) {
+        console.log('🚫 401 on auth endpoint - not redirecting');
+        return Promise.reject(error);
+      }
+      
+      console.log('🚨 401 Unauthorized - redirecting to login');
+      
+      // Clear any stored auth state and redirect
+      if (typeof window !== 'undefined') {
+        // Clear any auth cookies
+        document.cookie = '_elanAuth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
+        document.cookie = '_elanAuthR=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
+        
+        // Redirect to login
+        window.location.href = '/login';
+      }
+    }
+    
     return Promise.reject(error);
   }
 );
 
-// Helper function to get cookie value
-function getCookieValue(name: string): string | null {
-  if (typeof window === 'undefined') return null;
-  
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) {
-    return parts.pop()?.split(';').shift() || null;
+// Helper function to standardize error handling
+export const handleApiError = (error?: ApiError): string => {
+  if (!error) {
+    return 'An unexpected error occurred. Please try again.';
   }
-  return null;
-}
 
-// Helper function to manually set cookie (fallback) - removed as not used
+  // Return the main error message
+  let message = error.message || 'An unexpected error occurred.';
 
-// Error handling helper
-export const handleApiError = (error: ApiError | undefined): string => {
-  if (error?.errors) {
-    // Extract first error message
-    const firstError = Object.values(error.errors)[0];
-    if (Array.isArray(firstError)) {
-      return firstError[0];
-    }
+  // If there are specific field errors, append them
+  if (error.errors && typeof error.errors === 'object') {
+    const fieldErrors = Object.entries(error.errors)
+      .map(([field, messages]) => {
+        const messageArray = Array.isArray(messages) ? messages : [messages];
+        return `${field}: ${messageArray.join(', ')}`;
+      })
+      .join('; ');
     
-    // Handle specific error codes
-    if (typeof firstError === 'string') {
-      switch (firstError) {
-        case 'emailAlreadyExists':
-          return 'An account with this email already exists. Please try logging in instead.';
-        case 'invalidHash':
-          return 'Invalid or expired verification link. Please register again.';
-        default:
-          return firstError;
-      }
+    if (fieldErrors) {
+      message += ` (${fieldErrors})`;
     }
   }
-  return error?.message || 'An unexpected error occurred';
+
+  return message;
 };
 
-// Validation utilities
-export const validateRegistrationData = (userData: RegisterRequest): ValidationResult => {
+// Validation helper for email
+export const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+// Validation helper for user registration data
+export const validateRegistrationData = (userData: RegisterRequest) => {
   const errors: Record<string, string> = {};
 
-  // Full name validation
-  if (!userData.full_name || userData.full_name.trim().length === 0) {
-    errors.full_name = 'Full name is required';
+  // Name validation
+  if (!userData.full_name || userData.full_name.trim().length < 2) {
+    errors.full_name = 'Full name must be at least 2 characters long';
   }
 
-  // Email validation
-  if (!userData.email) {
+  // Email validation  
+  if (!userData.email || userData.email.trim().length === 0) {
     errors.email = 'Email is required';
   } else {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -176,17 +173,6 @@ export const authApi = {
       const axiosError = error as AxiosError<ApiError>;
       const errorData = axiosError.response?.data;
       
-      // Handle specific error cases
-      if (errorData?.errors?.email === 'emailAlreadyExists') {
-        return {
-          success: false,
-          error: {
-            ...errorData,
-            message: 'An account with this email already exists.'
-          }
-        };
-      }
-
       return { 
         success: false, 
         error: errorData || {
@@ -209,27 +195,6 @@ export const authApi = {
       const axiosError = error as AxiosError<ApiError>;
       const errorData = axiosError.response?.data;
       
-      // Handle specific error cases
-      if (errorData?.errors?.hash === 'invalidHash') {
-        return {
-          success: false,
-          error: {
-            ...errorData,
-            message: 'Invalid or expired verification link. Please try registering again.'
-          }
-        };
-      }
-
-      if (errorData?.status_code === 404) {
-        return {
-          success: false,
-          error: {
-            ...errorData,
-            message: 'User not found. Please register again.'
-          }
-        };
-      }
-
       return { 
         success: false, 
         error: errorData || {
@@ -240,113 +205,81 @@ export const authApi = {
     }
   },
 
-  // Resend confirmation email
-  resendConfirmation: async (email: string): Promise<ApiResponse> => {
+  // Initiate password reset process
+  forgotPassword: async (email: string): Promise<ApiResponse> => {
     try {
-      // Use registration endpoint for unverified emails
-      await api.post('/auth/customer/email/register', { email });
+      await api.post('/auth/customer/forgot/password', { email });
       return { 
         success: true,
-        data: { message: 'Confirmation email sent! Please check your inbox.' }
+        data: { message: 'If an account with this email exists, you will receive a password reset link shortly.' }
       };
     } catch (error) {
       const axiosError = error as AxiosError<ApiError>;
       const errorData = axiosError.response?.data;
       
-      // If email already exists and is verified
-      if (errorData?.errors?.email === 'emailAlreadyExists') {
-        return {
-          success: false,
-          error: {
-            ...errorData,
-            message: 'This email is already registered and verified. Please try logging in.'
-          }
-        };
-      }
-
       return { 
         success: false, 
         error: errorData || {
           status_code: 500,
-          message: 'Failed to resend confirmation email. Please try again.'
+          message: 'Failed to send password reset email. Please try again.'
         }
       };
     }
   },
 
-  // Login user and set JWT cookies
-  login: async (credentials: LoginRequest): Promise<ApiResponse> => {
+  // Reset password using hash from email
+  resetPassword: async (hash: string, newPassword: string): Promise<ApiResponse> => {
     try {
-      const response = await api.post('/auth/customer/email/login', credentials);
-      console.log('✅ Login successful, checking if cookies were set...');
-      
-      // Wait a bit for browser to process cookies
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Check if cookies are now available
-      const authCookie = getCookieValue('_elanAuth');
-      const authRefreshCookie = getCookieValue('_elanAuthR');
-      
-      console.log('🔍 Post-login cookie check:', {
-        _elanAuth: !!authCookie,
-        _elanAuthR: !!authRefreshCookie,
-        allCookies: document.cookie
+      await api.post('/auth/customer/reset/password', { 
+        hash,
+        password: newPassword 
       });
-      
-      return { success: true, data: response.data };
+      return { 
+        success: true,
+        data: { message: 'Password has been reset successfully! You can now login with your new password.' }
+      };
     } catch (error) {
       const axiosError = error as AxiosError<ApiError>;
-      return { success: false, error: axiosError.response?.data };
+      const errorData = axiosError.response?.data;
+      
+      return { 
+        success: false, 
+        error: errorData || {
+          status_code: 500,
+          message: 'Password reset failed. Please try again.'
+        }
+      };
     }
   },
 
-  // Get current user profile
+  // Login with email and password
+  login: async (credentials: LoginRequest): Promise<ApiResponse<UserProfile>> => {
+    try {
+      console.log('🔐 Attempting login...');
+      const response = await api.post('/auth/customer/email/login', credentials);
+      console.log('✅ Login successful:', response.data);
+      
+      return { 
+        success: true, 
+        data: response.data
+      };
+    } catch (error) {
+      const axiosError = error as AxiosError<ApiError>;
+      console.error('❌ Login failed:', axiosError.response?.data);
+      return { 
+        success: false, 
+        error: axiosError.response?.data 
+      };
+    }
+  },
+
+  // Get current authenticated user
   getCurrentUser: async (): Promise<ApiResponse<UserProfile>> => {
     try {
-      console.log('🔍 Fetching current user from:', api.defaults.baseURL + '/auth/customer/me');
-      
-      // Enhanced cookie debugging
-      const allCookies = document.cookie;
-      console.log('🍪 All available cookies:', allCookies);
-      
-      // Check if cookies exist before making request
-      const authCookie = getCookieValue('_elanAuth');
-      const authRefreshCookie = getCookieValue('_elanAuthR');
-      
-      console.log('🔍 Cookie check details:', {
-        _elanAuth: authCookie ? `Found (${authCookie.length} chars)` : 'Not found',
-        _elanAuthR: authRefreshCookie ? `Found (${authRefreshCookie.length} chars)` : 'Not found',
-        rawCookieString: allCookies
-      });
-      
-      if (!authCookie || !authRefreshCookie) {
-        console.log('❌ Auth cookies not found:', { 
-          authCookie: !!authCookie, 
-          authRefreshCookie: !!authRefreshCookie,
-          availableCookies: allCookies.split(';').map(c => c.trim().split('=')[0])
-        });
-        return { 
-          success: false, 
-          error: { 
-            status_code: 401, 
-            message: 'No authentication cookies found' 
-          } 
-        };
-      }
-      
-      console.log('🔐 Auth cookies found, making request...');
-      const response = await api.get<UserProfile>('/auth/customer/me');
-      console.log('✅ User data received:', response.data);
+      const response = await api.get('/auth/customer/me');
       return { success: true, data: response.data };
     } catch (error) {
       const axiosError = error as AxiosError<ApiError>;
-      console.error('❌ Get current user error:', {
-        status: axiosError.response?.status,
-        statusText: axiosError.response?.statusText,
-        data: axiosError.response?.data,
-        url: axiosError.config?.url,
-        baseURL: axiosError.config?.baseURL
-      });
       return { success: false, error: axiosError.response?.data };
     }
   },
@@ -354,55 +287,29 @@ export const authApi = {
   // Update user profile
   updateProfile: async (updateData: UpdateProfileRequest): Promise<ApiResponse<UserProfile>> => {
     try {
-      const response = await api.patch<UserProfile>('/auth/customer/me', updateData);
+      console.log('🔄 Updating profile with data:', updateData);
+      const response = await api.patch('/auth/customer/me', updateData);
+      console.log('✅ Profile update successful:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
       const axiosError = error as AxiosError<ApiError>;
+      console.error('❌ Profile update failed:', axiosError.response?.data);
       return { success: false, error: axiosError.response?.data };
     }
   },
 
-  // Refresh JWT tokens
-  refreshToken: async (): Promise<ApiResponse> => {
-    try {
-      await api.post('/auth/customer/refresh');
-      return { success: true };
-    } catch (error) {
-      const axiosError = error as AxiosError<ApiError>;
-      return { success: false, error: axiosError.response?.data };
-    }
-  },
-
-  // Logout user and clear cookies
+  // Logout
   logout: async (): Promise<ApiResponse> => {
     try {
+      console.log('🚪 Logging out...');
       await api.post('/auth/customer/logout');
+      console.log('✅ Logout successful');
       return { success: true };
     } catch (error) {
       const axiosError = error as AxiosError<ApiError>;
-      return { success: false, error: axiosError.response?.data };
-    }
-  },
-
-  // Initiate password reset process
-  forgotPassword: async (email: string): Promise<ApiResponse> => {
-    try {
-      await api.post('/auth/customer/forgot/password', { email });
+      console.error('❌ Logout error:', axiosError.response?.data);
+      // Even if logout fails on backend, we'll clear frontend state
       return { success: true };
-    } catch (error) {
-      const axiosError = error as AxiosError<ApiError>;
-      return { success: false, error: axiosError.response?.data };
-    }
-  },
-
-  // Reset password using token from email
-  resetPassword: async (hash: string, password: string): Promise<ApiResponse> => {
-    try {
-      await api.post('/auth/customer/reset/password', { hash, password });
-      return { success: true };
-    } catch (error) {
-      const axiosError = error as AxiosError<ApiError>;
-      return { success: false, error: axiosError.response?.data };
     }
   },
 
@@ -417,5 +324,64 @@ export const authApi = {
     }
   },
 };
+
+// ============================================================================
+// BOOKING API EXPORTS
+// ============================================================================
+
+// Export booking service methods for easy access
+export const bookingApi = {
+  // Drive Test Centers
+  getDriveTestCenters: () => bookingService.getDriveTestCenters(),
+  getDriveTestCenterById: (id: number) => bookingService.getDriveTestCenterById(id),
+  
+  // Addons
+  getAddons: () => bookingService.getAddons(),
+  getAddonById: (id: number) => bookingService.getAddonById(id),
+  
+  // Coupons
+  verifyCoupon: (couponCode: string) => bookingService.verifyCoupon(couponCode),
+  
+  // Address Search
+  searchAddresses: (query: string, limit?: number) => bookingService.searchAddresses(query, limit),
+  
+  // Bookings
+  getBookings: () => bookingService.getBookings(),
+  getRecentBookings: () => bookingService.getRecentBookings(),
+  getBookingById: (id: number) => bookingService.getBookingById(id),
+  createBooking: (bookingData: CreateBookingRequest) => bookingService.createBooking(bookingData),
+  
+  // Distance Calculation - NEW BACKEND API
+  calculateDistanceAPI: (pickupLat: number, pickupLng: number, testCenterLat: number, testCenterLng: number) => 
+    bookingService.calculateDistanceAPI(pickupLat, pickupLng, testCenterLat, testCenterLng),
+  
+  // Utility methods
+  calculateDistance: (pickup: { lat: number; lng: number }, testCenter: { lat: number; lng: number }) => 
+    bookingService.calculateDistance(pickup, testCenter),
+  calculatePricingBreakdown: (params: {
+    basePrice: number;
+    pickupDistance?: number;
+    meetAtCenter?: boolean;
+    addon?: Addon | null;
+    coupon?: Coupon | null;
+  }) => bookingService.calculatePricingBreakdown(params),
+  validateBookingData: (data: CreateBookingRequest) => bookingService.validateBookingData(data),
+};
+
+// Export the booking service instance for direct access if needed
+export { bookingService };
+
+// Export types for easy importing
+export type {
+  DriveTestCenter,
+  Addon,
+  Coupon,
+  AddressSearchResult,
+  Booking,
+  CreateBookingRequest,
+  PricingBreakdown,
+  TestType,
+  DistanceCalculationResponse
+} from '@/lib/types/booking.types';
 
 export default api;

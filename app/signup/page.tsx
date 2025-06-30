@@ -39,6 +39,8 @@ export default function SignupPage() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
   
   const validateField = (name: string, value: string) => {
     switch (name) {
@@ -98,6 +100,26 @@ export default function SignupPage() {
       ...errors,
       [name]: validateField(name, value)
     });
+  };
+  
+  const handleResendConfirmation = async () => {
+    setIsResendingEmail(true);
+    setResendMessage("");
+    try {
+      const result = await authApi.confirmEmail(formData.email);
+      
+      if (result.success) {
+        setResendMessage("Verification email sent! Please check your inbox.");
+      } else {
+        const errorMessage = handleApiError(result.error);
+        setResendMessage(`Failed to resend email: ${errorMessage}`);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+      setResendMessage("Failed to resend verification email. Please try again.");
+    } finally {
+      setIsResendingEmail(false);
+    }
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -161,7 +183,7 @@ export default function SignupPage() {
           general: errorMessage
         }));
       }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       // Handle unexpected errors
       setErrors(prev => ({
@@ -203,15 +225,28 @@ export default function SignupPage() {
               </button>
             </Link>
             
-            <p className="text-sm text-gray-600">
-              {"Didn't receive the email?"}{" "}
-              <button 
-                onClick={() => authApi.resendConfirmation(formData.email)}
-                className="text-[#0C8B44] hover:underline font-medium"
-              >
-                Resend verification email
-              </button>
-            </p>
+            <div className="space-y-2">
+              <p className="text-sm text-gray-600">
+                {"Didn't receive the email?"}{" "}
+                <button 
+                  onClick={handleResendConfirmation}
+                  disabled={isResendingEmail}
+                  className="text-[#0C8B44] hover:underline font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isResendingEmail ? "Sending..." : "Resend verification email"}
+                </button>
+              </p>
+              
+              {resendMessage && (
+                <div className={`text-sm p-3 rounded-md ${
+                  resendMessage.includes("Failed") 
+                    ? "bg-red-50 text-red-600 border border-red-200" 
+                    : "bg-blue-50 text-blue-600 border border-blue-200"
+                }`}>
+                  {resendMessage}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@ import React from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
+import { TestType, Addon } from "@/lib/types/booking.types";
 
 interface MockTestCardProps {
   className?: string;
@@ -11,6 +12,10 @@ interface MockTestCardProps {
   percentage?: number;
   onAdd?: () => void;
   variant?: "default" | "compact";
+  // New API props
+  testType?: TestType;
+  addon?: Addon | null;
+  isLoading?: boolean;
 }
 
 export default function MockTestCard({
@@ -18,8 +23,18 @@ export default function MockTestCard({
   isAdded = false,
   percentage = 95,
   onAdd,
-  variant = "default"
+  variant = "default",
+  testType,
+  isLoading = false
 }: MockTestCardProps) {
+  
+  // Get testType from props or fallback to G2
+  const displayTestType = testType || 'G2';
+  
+  // Get mock test addon from the API response
+
+  // Get price from API or fallback
+
   if (variant === "compact") {
     return (
       <div 
@@ -35,7 +50,7 @@ export default function MockTestCard({
         <div className="flex justify-between items-start">
           <div>
             <h3 className={cn("font-medium", isAdded ? "text-[#0C8B44]" : "")}>
-              Complete Mock Test {isAdded && "Added"}
+              {isAdded ? `Complete ${displayTestType} Mock Test Added` : "Complete Mock Test"}
             </h3>
             <p className="text-xs text-gray-600 mt-1">
               {percentage}% of our customers choose this pass their exam at first chance
@@ -61,7 +76,7 @@ export default function MockTestCard({
           <div className="flex items-start justify-between">
             <div>
               <h3 className="font-medium text-[#0C8B44]">
-                Complete Mock Test Added
+                Complete {displayTestType} Mock Test Added
               </h3>
               <p className="text-sm text-gray-600 mt-1">
                 {percentage}% of our customers choose this pass their exam at first chance
@@ -93,7 +108,7 @@ export default function MockTestCard({
             <div className="flex flex-col gap-8 items-start justify-between">
               <div>
                 <h3 className="font-medium text-[#0C8B44] text-xl">
-                  Upgrade to a Complete Mock Test
+                  Upgrade to a Complete {displayTestType} Mock Test
                 </h3>
                 <p className="text-gray-600 mt-1">
                   {percentage}% of our customers choose this pass their exam at first chance
@@ -102,9 +117,10 @@ export default function MockTestCard({
               
               <Button 
                 onClick={onAdd}
-                className="px-3 py-1 w-full cursor-pointer bg-black text-white rounded-md text-sm hover:bg-black/80 transition-colors"
+                disabled={isLoading}
+                className="px-3 py-1 w-full cursor-pointer bg-black text-white rounded-md text-sm hover:bg-black/80 transition-colors disabled:opacity-50"
               >
-                🎉 Upgrade to Mock Test 🎉
+                🎉 {isLoading ? "Loading..." : "Upgrade to Mock Test"} 🎉
               </Button>
             </div>
           </div>

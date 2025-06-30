@@ -20,7 +20,7 @@ import {
 const Navbar = () => {
   const { user, isAuthenticated, logout, isLoading } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
+  console.log(user)
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {

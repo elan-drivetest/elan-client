@@ -9,6 +9,11 @@ import HelpCard from "./HelpCard";
 import SummaryAddOns from "./SummaryAddOns";
 import { AddOnType } from "@/app/book-road-test-vehicle/test-details/page";
 import { useBooking } from "@/lib/context/BookingContext";
+import { useDriveTestCenters, useCouponVerification, useAddons } from "@/lib/hooks/useBooking";
+import { formatPrice } from "@/lib/types/booking.types";
+import { getDistancePerks, UPGRADE_PRICING } from "@/lib/utils/distance-calculator";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface PaymentBreakdownItem {
   label: string;
@@ -32,7 +37,7 @@ interface TestSummaryProps {
   selectedAddOn?: AddOnType;
   toggleAddOn?: (type: AddOnType) => void;
   className?: string;
-  isConfirmationPage?: boolean; // Add this prop to handle confirmation page display
+  isConfirmationPage?: boolean;
 }
 
 export default function TestSummary({
@@ -45,139 +50,409 @@ export default function TestSummary({
   testCentreAddress,
   onApplyPromo,
   onRemoveAddOn,
-  selectedAddOn = null,
   toggleAddOn = () => {},
   className,
-  isConfirmationPage = false, // Default to false for regular pages
+  isConfirmationPage = false,
 }: TestSummaryProps) {
   const [promoCode, setPromoCode] = React.useState("");
+  const [couponError, setCouponError] = React.useState("");
+  const [appliedCoupon, setAppliedCoupon] = React.useState<any>(null);
+  
   const { bookingState } = useBooking();
+  
+  // API hooks
+  const { addons } = useAddons();
+  const { centers: testCenters, getCenterById } = useDriveTestCenters();
+  const { verifyCoupon, loading: couponLoading } = useCouponVerification();
 
-  const handleApplyPromo = () => {
-    onApplyPromo(promoCode);
+  // Get selected test center details
+  const getSelectedTestCenter = () => {
+    if (bookingState.testCenterId && testCenters.length > 0) {
+      const centerId = typeof bookingState.testCenterId === 'string' 
+        ? parseInt(bookingState.testCenterId) 
+        : bookingState.testCenterId;
+      return getCenterById(centerId);
+    }
+    return null;
   };
 
-  // Format currency
-  const formatCurrency = (value: number): string => {
-    return `$ ${value.toFixed(2)} CAD`;
+  // Get real base price from selected test center
+  const getRealBasePrice = (): number => {
+    const selectedTestCenter = getSelectedTestCenter();
+    if (selectedTestCenter) {
+      return selectedTestCenter.base_price; // Already in cents from API
+    }
+    return 8000; // Default $80.00 in cents
   };
 
-  // Calculate add-on price directly
+  // Get mock test addon
+  const getMockTestAddon = () => {
+    if (!addons || addons.length === 0) return null;
+    
+    const testType = bookingState.testType;
+    if (!testType) return null;
+    
+    const mockTestAddon = addons.find(addon => {
+      const isMockTest = addon.name.toLowerCase().includes('mock test');
+      if (!isMockTest) return false;
+      
+      if (testType === 'G') {
+        return addon.name.toLowerCase().includes('of g') && !addon.name.toLowerCase().includes('g2');
+      } else if (testType === 'G2') {
+        return addon.name.toLowerCase().includes('of g2');
+      }
+      
+      return false;
+    });
+    
+    return mockTestAddon || null;
+  };
+
+  // Get driving lesson addon
+  const getDrivingLessonAddon = () => {
+    if (!addons || addons.length === 0) return null;
+    
+    const testType = bookingState.testType;
+    if (!testType) return null;
+    
+    const lessonAddon = addons.find(addon => {
+      const isLesson = addon.name.toLowerCase().includes('lesson') && 
+                     addon.name.toLowerCase().includes('1 hour');
+      if (!isLesson) return false;
+      
+      if (testType === 'G') {
+        return addon.name.toLowerCase().includes('of g') && !addon.name.toLowerCase().includes('g2');
+      } else if (testType === 'G2') {
+        return addon.name.toLowerCase().includes('of g2');
+      }
+      
+      return false;
+    });
+    
+    return lessonAddon || null;
+  };
+
+  // FIXED: Handle API response with detailed debugging for coupon verification
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    
+    setCouponError("");
+    
+    try {
+      const result = await verifyCoupon(promoCode);
+      
+      // DETAILED DEBUGGING: Log the exact response structure
+      console.log('🔍 Raw coupon API result:', result);
+      console.log('🔍 Result type:', typeof result);
+      console.log('🔍 Result keys:', result ? Object.keys(result) : 'null');
+      
+      // Handle different possible response structures
+      if (result) {
+        let couponData = null;
+        let isValid = false;
+        
+        // Case 1: API wrapper response like {success: true, data: {coupon: {...}}}
+        if (typeof result === 'object' && 'success' in result) {
+          const apiResult = result as { success: boolean; data?: any; error?: { message?: string } };
+          console.log('📦 API wrapper detected:', apiResult);
+          
+          if (apiResult.success && apiResult.data) {
+            // Try different nested structures
+            couponData = apiResult.data.coupon || apiResult.data;
+            isValid = true;
+          } else {
+            setCouponError(apiResult.error?.message || "Invalid coupon code");
+            return;
+          }
+        }
+        // Case 2: Direct coupon object like {code: "QT0NFO1", discount: 1000}
+        else if (typeof result === 'object' && ('code' in result || 'discount' in result)) {
+          const couponResult = result as { code?: string; discount?: number };
+          console.log('🎯 Direct coupon object detected:', couponResult);
+          console.log('🎯 Discount value:', couponResult.discount, 'Type:', typeof couponResult.discount);
+          couponData = result;
+          isValid = true;
+        }
+        // FIXED: Handle the case where verifyCoupon returns the coupon directly
+        else if (typeof result === 'object' && result !== null) {
+          console.log('🎯 Processing coupon object:', result);
+          couponData = result;
+          isValid = true;
+        }
+        // Case 3: Boolean response (true/false) - This shouldn't happen with a proper API
+        // else if (typeof result === 'boolean') {
+        //   console.log('🔘 Boolean result:', result);
+        //   console.warn('⚠️ API returned boolean instead of coupon object. This indicates an issue with the verifyCoupon hook.');
+        //   if (result) {
+        //     // FIXED: Don't create a coupon with 0 discount - this is wrong!
+        //     setCouponError("API returned invalid response format. Please check the verifyCoupon implementation.");
+        //     return;
+        //   } else {
+        //     setCouponError("Invalid coupon code");
+        //     return;
+        //   }
+        // }
+        // Case 4: Any other truthy value
+        else {
+          console.log('❓ Unknown result format:', result);
+          couponData = result;
+          isValid = true;
+        }
+        
+        console.log('✅ Final coupon data:', couponData);
+        console.log('✅ Is valid:', isValid);
+        
+        if (isValid && couponData) {
+          console.log('🔍 Before processing - couponData:', couponData);
+          
+          // Ensure we have at least a code
+          if (!couponData.code) {
+            couponData.code = promoCode;
+            console.log('📝 Added missing code:', couponData.code);
+          }
+          
+          // FIXED: Preserve the original discount value from API (it's already in cents)
+          // Don't override the discount if it exists and is a valid number
+          console.log('🔍 Checking discount - Value:', couponData.discount, 'Type:', typeof couponData.discount, 'Is undefined?', couponData.discount === undefined);
+          
+          if (typeof couponData.discount !== 'number' || couponData.discount === undefined || isNaN(couponData.discount)) {
+            console.warn('⚠️ Discount is not a valid number, setting to 0. Original value was:', couponData.discount);
+            couponData.discount = 0;
+          } else {
+            console.log('✅ Discount is valid:', couponData.discount);
+          }
+          
+          console.log('🎉 Final coupon data before setting state:', couponData);
+          console.log('💰 Final discount amount (in cents):', couponData.discount);
+          
+          setAppliedCoupon(couponData);
+          onApplyPromo(promoCode);
+          setPromoCode("");
+        } else {
+          console.error('❌ Coupon validation failed');
+          setCouponError("Invalid coupon response");
+          setAppliedCoupon(null);
+        }
+      } else {
+        console.log('❌ No result received');
+        setCouponError("Invalid coupon code");
+        setAppliedCoupon(null);
+      }
+    } catch (error) {
+      console.error('❌ Coupon verification error:', error);
+      setCouponError("Failed to verify coupon. Please try again.");
+      setAppliedCoupon(null);
+    }
+  };
+
+  // Format currency from cents to CAD
+  const formatCurrency = (valueInCents: number): string => {
+    return formatPrice(valueInCents);
+  };
+
+  // Calculate add-on price using real API data with proper upgrade logic
   const calculateAddOnPrice = (): number => {
     if (!bookingState.selectedAddOn) return 0;
     
-    const isG2 = bookingState.testType === 'G2';
-    const isFreeLessonUpgrade = bookingState.freeAddOn === 'thirty-min-lesson';
+    const testType = bookingState.testType as 'G2' | 'G';
+    const isFreeLessonUpgrade30min = bookingState.freeAddOn === 'thirty-min-lesson';
+    const isFreeLessonUpgrade1hr = bookingState.freeAddOn === 'one-hour-lesson';
     
     if (bookingState.selectedAddOn === 'mock-test') {
-      if (isFreeLessonUpgrade) {
-        return isG2 ? 29.99 : 34.99; // Upgrade pricing
+      const mockTestAddon = getMockTestAddon();
+      
+      if (!mockTestAddon) {
+        // Fallback to original pricing logic
+        if (isFreeLessonUpgrade30min) {
+          return testType === 'G2' ? 2999 : 3499; // $29.99 or $34.99 in cents
+        } else if (isFreeLessonUpgrade1hr) {
+          return testType === 'G2' ? 499 : 499; // $4.99 in cents for both G2 and G
+        }
+        return testType === 'G2' ? 5499 : 6499; // $54.99 or $64.99 in cents
       }
-      return isG2 ? 54.99 : 64.99; // Regular pricing
+      
+      // Use real API pricing with upgrade logic
+      if (isFreeLessonUpgrade30min) {
+        return testType === 'G2' ? UPGRADE_PRICING.G2.LESSON_30MIN_TO_MOCK : UPGRADE_PRICING.G.LESSON_30MIN_TO_MOCK;
+      } else if (isFreeLessonUpgrade1hr) {
+        return testType === 'G2' ? UPGRADE_PRICING.G2.LESSON_1HR_TO_MOCK : UPGRADE_PRICING.G.LESSON_1HR_TO_MOCK;
+      }
+      return mockTestAddon.price; // Full price if no free lesson
+      
     } else if (bookingState.selectedAddOn === 'driving-lesson') {
-      if (isFreeLessonUpgrade) {
-        return isG2 ? 25.00 : 30.00; // Upgrade pricing
+      const lessonAddon = getDrivingLessonAddon();
+      
+      if (!lessonAddon) {
+        // Fallback to original pricing logic
+        if (isFreeLessonUpgrade30min) {
+          return testType === 'G2' ? 2500 : 3000; // $25.00 or $30.00 in cents
+        }
+        return testType === 'G2' ? 5000 : 6000; // $50.00 or $60.00 in cents
       }
-      return isG2 ? 50.00 : 60.00; // Regular pricing
+      
+      // Use real API pricing
+      if (isFreeLessonUpgrade30min) {
+        return testType === 'G2' ? UPGRADE_PRICING.G2.LESSON_30MIN_TO_1HR : UPGRADE_PRICING.G.LESSON_30MIN_TO_1HR;
+      }
+      return lessonAddon.price; // Full price if no free lesson
     }
     
     return 0;
   };
 
-  // Generate payment breakdown based on booking state and direct calculations
+  // Get pickup distance display with actual distance from booking state
+  const getPickupDistanceDisplay = (): string => {
+    if (bookingState.locationOption === 'test-centre') {
+      return '';
+    }
+    
+    if (!bookingState.pickupDistance || bookingState.pickupDistance === 0) {
+      return '0.0km from Test Centre';
+    }
+    
+    return `${bookingState.pickupDistance.toFixed(1)}km from Test Centre`;
+  };
+
+  // Calculate pickup price based on actual distance
+  const calculatePickupPrice = (): number => {
+    if (bookingState.locationOption === 'pickup' && bookingState.pickupDistance) {
+      const distance = bookingState.pickupDistance;
+      if (distance <= 50) {
+        return Math.round(distance * 100); // $1/km in cents
+      } else {
+        return Math.round((50 * 100) + ((distance - 50) * 50)); // First 50km + $0.50/km for rest
+      }
+    }
+    return 0;
+  };
+
+  // Get distance benefits for free services display
+  const getDistanceBenefits = () => {
+    if (!bookingState.pickupDistance || bookingState.locationOption === 'test-centre') {
+      return { free_dropoff: false, free_30min_lesson: false, free_1hr_lesson: false };
+    }
+    return getDistancePerks(bookingState.pickupDistance);
+  };
+
+  // Generate payment breakdown with proper upgrade logic
   const generatePaymentBreakdown = (): PaymentBreakdownItem[] => {
     const breakdown: PaymentBreakdownItem[] = [];
-    const pricing = bookingState.pricing || {
-      basePrice: 80.00,
-      pickupPrice: 0,
-      addOnPrice: 0, // This will be overridden
-      discounts: 0,
-      total: 80.00
-    };
     
-    // Calculate add-on price directly
-    const addOnPrice = calculateAddOnPrice();
+    // Use real base price from selected test center
+    const realBasePrice = getRealBasePrice();
     
-    // Base price
+    // Calculate pickup price using actual distance
+    const pickupPriceInCents = calculatePickupPrice();
+    
+    // Calculate add-on price using real API data
+    const addOnPriceInCents = calculateAddOnPrice();
+
     breakdown.push({
       label: "Road Test Centre",
-      price: formatCurrency(pricing.basePrice)
+      price: formatCurrency(realBasePrice)
     });
     
-    // Pickup price if applicable
+    // Pickup price if applicable with real distance
     if (bookingState.locationOption === 'pickup' && bookingState.pickupAddress) {
       breakdown.push({
         label: `Pickup Price`,
-        price: formatCurrency(pricing.pickupPrice)
+        price: formatCurrency(pickupPriceInCents)
       });
       
-      // Add free dropoff line if eligible
-      if (bookingState.pickupDistance && bookingState.pickupDistance > 50) {
+      // Add free services based on distance
+      const distanceBenefits = getDistanceBenefits();
+      if (distanceBenefits.free_dropoff) {
         breakdown.push({
-          label: `Free Drop-Off Service`,
-          price: '$ 0.00 CAD',
+          label: `🎉 Free Drop-Off Service`,
+          price: formatCurrency(0),
           isFree: true
         });
       }
     }
     
-    // Selected add-on if any
+    // Selected add-on with proper upgrade logic
     if (bookingState.selectedAddOn === 'mock-test') {
-      // If upgrading from free 30-min lesson to mock test
+      const mockTestAddon = getMockTestAddon();
+      const addonName = mockTestAddon?.name || "Complete Mock Test";
+      
+      // Handle upgrade from free 30-min lesson to mock test
       if (bookingState.freeAddOn === 'thirty-min-lesson') {
         breakdown.push({
           label: "Mock Test Upgrade (from free 30-min lesson)",
-          price: formatCurrency(addOnPrice)
+          price: formatCurrency(addOnPriceInCents)
         });
-      } else {
+      } 
+      // Handle upgrade from free 1-hour lesson to mock test
+      else if (bookingState.freeAddOn === 'one-hour-lesson') {
         breakdown.push({
-          label: "Complete Mock Test",
-          price: formatCurrency(addOnPrice)
+          label: "Mock Test Upgrade (from free 1-hour lesson)",
+          price: formatCurrency(addOnPriceInCents)
+        });
+      } 
+      // Full price mock test (no free lesson)
+      else {
+        breakdown.push({
+          label: addonName,
+          price: formatCurrency(addOnPriceInCents)
         });
       }
     } else if (bookingState.selectedAddOn === 'driving-lesson') {
-      // If upgrading from free 30-min lesson to 1-hour lesson
+      const lessonAddon = getDrivingLessonAddon();
+      const addonName = lessonAddon?.name || "1 hour Driving Lesson";
+      
+      // Handle upgrade from free 30-min lesson to 1-hour lesson
       if (bookingState.freeAddOn === 'thirty-min-lesson') {
         breakdown.push({
           label: "1-hour Lesson Upgrade (from free 30-min lesson)",
-          price: formatCurrency(addOnPrice)
+          price: formatCurrency(addOnPriceInCents)
         });
-      } else {
+      } 
+      // Full price lesson (no free lesson)
+      else {
         breakdown.push({
-          label: "1 hour Driving Lesson",
-          price: formatCurrency(addOnPrice)
+          label: addonName,
+          price: formatCurrency(addOnPriceInCents)
         });
       }
     }
     
-    // Free add-on if eligible - only show if not being upgraded
-    const isUpgrading = bookingState.freeAddOn === 'thirty-min-lesson' && bookingState.selectedAddOn !== null;
+    // Free add-on display logic - only show if not being upgraded
+    const isUpgrading = bookingState.selectedAddOn !== null;
+    const distanceBenefits = getDistanceBenefits();
     
+    // Show free 30-min lesson only if not upgrading from it
     if (bookingState.freeAddOn === 'thirty-min-lesson' && !isUpgrading) {
       breakdown.push({
         label: "🎉 Free 30-minute driving lesson",
-        price: '$ 0.00 CAD',
+        price: formatCurrency(0),
         isFree: true
       });
-    } else if (bookingState.freeAddOn === 'one-hour-lesson') {
+    } 
+    // Show free 1-hour lesson only if not upgrading from it
+    else if ((bookingState.freeAddOn === 'one-hour-lesson' || distanceBenefits.free_1hr_lesson) && !isUpgrading) {
       breakdown.push({
         label: "🎉 Free 1-hour driving lesson",
-        price: '$ 0.00 CAD',
+        price: formatCurrency(0),
         isFree: true
       });
     }
     
-    // Discounts if any
-    if (pricing.discounts > 0) {
+    // Applied coupon discount
+    if (appliedCoupon && appliedCoupon.code && typeof appliedCoupon.discount === 'number') {
+      console.log('💳 Adding coupon to breakdown:', appliedCoupon.code, 'Discount:', appliedCoupon.discount);
       breakdown.push({
-        label: "Discount (Free Dropoff)",
-        price: `- ${formatCurrency(pricing.discounts)}`,
+        label: `Discount (${appliedCoupon.code})`,
+        price: `- ${formatCurrency(appliedCoupon.discount)}`,
         isDiscount: true
       });
+    } else if (appliedCoupon) {
+      console.warn('⚠️ Coupon exists but invalid:', appliedCoupon);
     }
     
-    // Calculate total directly
-    const total = pricing.basePrice + pricing.pickupPrice + addOnPrice - pricing.discounts;
+    // Calculate total with real pricing
+    const subtotal = realBasePrice + pickupPriceInCents + addOnPriceInCents;
+    const discountAmount = (appliedCoupon && typeof appliedCoupon.discount === 'number') ? appliedCoupon.discount : 0;
+    const total = Math.max(0, subtotal - discountAmount);
     
     // Total
     breakdown.push({
@@ -188,6 +463,33 @@ export default function TestSummary({
     
     return breakdown;
   };
+
+  // FIXED: Determine what should be shown in SummaryAddOns based on upgrade logic
+  const getSummaryAddOnProps = () => {
+    // If user has free 1-hour lesson and upgrades to mock test, show only mock test as selected
+    if (bookingState.freeAddOn === 'one-hour-lesson' && bookingState.selectedAddOn === 'mock-test') {
+      return {
+        selectedAddOn: 'mock-test' as AddOnType,
+        freeAddOn: null // Hide free lesson since it's being upgraded
+      };
+    }
+    
+    // If user has free 30-min lesson and upgrades to something, show only the upgrade
+    if (bookingState.freeAddOn === 'thirty-min-lesson' && bookingState.selectedAddOn) {
+      return {
+        selectedAddOn: bookingState.selectedAddOn,
+        freeAddOn: null // Hide free lesson since it's being upgraded
+      };
+    }
+    
+    // Default: show current state
+    return {
+      selectedAddOn: bookingState.selectedAddOn,
+      freeAddOn: bookingState.freeAddOn
+    };
+  };
+
+  const summaryAddOnProps = getSummaryAddOnProps();
 
   return (
     <div className={cn("border rounded-lg", className)}>
@@ -229,10 +531,10 @@ export default function TestSummary({
             checked={true} 
           />
           
-          {/* Show pickup address if option is pickup */}
+          {/* Show pickup address with actual distance */}
           {bookingState.locationOption === 'pickup' && bookingState.pickupAddress && (
             <SummaryItem 
-              label={`Pickup Address (${bookingState.pickupDistance}km from Test Centre)`}
+              label={`Pickup Address (${getPickupDistanceDisplay()})`}
               value={bookingState.pickupAddress}
               checked={true} 
             />
@@ -243,20 +545,37 @@ export default function TestSummary({
           <h3 className="text-sm font-medium mb-2">Promo codes</h3>
           <p className="text-xs text-gray-600 mb-2">Unless stated otherwise, all discounts are one-time.</p>
           {!isConfirmationPage ? (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={promoCode}
-                onChange={(e) => setPromoCode(e.target.value)}
-                placeholder="Promo code"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#0C8B44]"
-              />
-              <button
-                onClick={handleApplyPromo}
-                className="px-4 py-2 bg-[#0C8B44] text-white rounded-md text-sm font-medium hover:bg-[#0A7A3C] transition-colors"
-              >
-                Apply
-              </button>
+            <div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
+                  placeholder="Promo code"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#0C8B44]"
+                />
+                <button
+                  onClick={handleApplyPromo}
+                  disabled={couponLoading}
+                  className="px-4 py-2 bg-[#0C8B44] text-white rounded-md text-sm font-medium hover:bg-[#0A7A3C] transition-colors disabled:opacity-50"
+                >
+                  {couponLoading ? "Applying..." : "Apply"}
+                </button>
+              </div>
+              
+              {/* Coupon error message */}
+              {couponError && (
+                <p className="text-xs text-red-500 mt-1">{couponError}</p>
+              )}
+              
+              {/* Applied coupon success */}
+              {appliedCoupon && appliedCoupon.code && (
+                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                  <p className="text-xs text-green-700">
+                    {`✅ Coupon "${appliedCoupon.code}" applied! You saved ${formatCurrency(appliedCoupon.discount || 0)}`}
+                  </p>
+                </div>
+              )}
             </div>
           ) : null}
         </div>
@@ -294,13 +613,13 @@ export default function TestSummary({
           </div>
         </div>
         
-        {/* Add-ons selection in summary */}
+        {/* FIXED: Add-ons selection in summary with proper mutual exclusion */}
         {toggleAddOn && onRemoveAddOn && !isConfirmationPage && (
           <SummaryAddOns 
-            selectedAddOn={selectedAddOn}
+            selectedAddOn={summaryAddOnProps.selectedAddOn ?? null}
             toggleAddOn={toggleAddOn}
             onRemove={onRemoveAddOn}
-            freeAddOn={bookingState.freeAddOn}
+            freeAddOn={summaryAddOnProps.freeAddOn}
           />
         )}
         

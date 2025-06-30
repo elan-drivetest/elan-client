@@ -1,6 +1,5 @@
-import { TestCenter } from "@/components/booking/TestCenterDropdown";
 
-export const testCenters: TestCenter[] = [
+export const testCenters = [
   {
     id: "1",
     name: "Arnprior",

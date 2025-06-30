@@ -1,8 +1,7 @@
-// File path: app/book-road-test-vehicle/confirmation/page.tsx
-
+// app/book-road-test-vehicle/confirmation/page.tsx
 "use client"
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useBooking } from "@/lib/context/BookingContext";
 import BookingStepsProgress from "@/components/booking/BookingStepsProgress";
@@ -18,10 +17,18 @@ const bookingSteps = [
 export default function Confirmation() {
   const { bookingState, setCurrentStep, calculatePricing } = useBooking();
   
+  // Use ref to prevent infinite re-renders
+  const hasInitialized = useRef(false);
+  
   useEffect(() => {
-    setCurrentStep(4); // Still at step 4 but completed
-    calculatePricing();
-  }, [setCurrentStep, calculatePricing]);
+    if (!hasInitialized.current) {
+      setCurrentStep(4); // Still at step 4 but completed
+      if (calculatePricing) {
+        calculatePricing();
+      }
+      hasInitialized.current = true;
+    }
+  }, []); // Empty dependency array to prevent infinite loops
   
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleApplyPromo = (code: string) => {
@@ -75,7 +82,7 @@ export default function Confirmation() {
             vehicleModel="Lexus UX or Similar"
             vehicleFeatures={["Gas", "5 seats", "Automatic"]}
             startDate={formattedStartDate}
-            testCentre={bookingState.testCenter || "Road Test Centre"}
+            testCentre={typeof bookingState.testCenter === 'object' ? bookingState.testCenter?.name ?? "" : bookingState.testCenter ?? "Road Test Centre"}
             testCentreAddress={bookingState.testCenterAddress || "5555 Eglinton Ave W Etobicoke ON M9C 5M1"}
             onApplyPromo={handleApplyPromo}
             hasAddOn={!!bookingState.selectedAddOn}

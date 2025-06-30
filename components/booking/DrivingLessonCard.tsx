@@ -3,6 +3,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
+import { TestType, Addon } from "@/lib/types/booking.types";
 
 interface DrivingLessonCardProps {
   className?: string;
@@ -11,6 +12,10 @@ interface DrivingLessonCardProps {
   variant?: "default" | "compact";
   isSelected?: boolean;
   onSelect?: () => void;
+  // New API props - ONLY ADDITION
+  testType?: TestType;
+  addon?: Addon | null;
+  isLoading?: boolean;
 }
 
 export default function DrivingLessonCard({
@@ -19,8 +24,24 @@ export default function DrivingLessonCard({
   description,
   variant = "default",
   isSelected = false,
-  onSelect
-}: DrivingLessonCardProps) {
+  onSelect,
+  addon}: DrivingLessonCardProps) {
+    
+  // Format duration from API (seconds to readable format) - ONLY ADDITION
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return duration; // fallback to prop
+    
+    const minutes = Math.round(seconds / 60);
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60);
+      return `${hours} hour${hours > 1 ? 's' : ''}`;
+    }
+    return `${minutes} minutes`;
+  };
+
+  // Get formatted duration - ONLY ADDITION
+  const displayDuration = addon?.duration ? formatDuration(addon.duration) : duration;
+  
   if (variant === "compact") {
     return (
       <div 
@@ -36,7 +57,7 @@ export default function DrivingLessonCard({
         <div className="flex justify-between items-start">
           <div>
             <h3 className={cn("font-medium", isSelected ? "text-[#0C8B44]" : "")}>
-              {duration} Driving Lesson
+              {displayDuration} Driving Lesson
             </h3>
             <p className="text-xs text-gray-500 mt-1">
               {description}
@@ -67,7 +88,7 @@ export default function DrivingLessonCard({
     >
       <div className="flex justify-between items-start">
         <div>
-          <h3 className="font-medium text-gray-600">{duration} Driving Lesson</h3>
+          <h3 className="font-medium text-gray-600">{displayDuration} Driving Lesson</h3>
           <p className="text-sm text-gray-500">{description}</p>
         </div>
         
