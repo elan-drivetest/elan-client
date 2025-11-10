@@ -387,3 +387,52 @@ export const formatDateForApi = (date: Date, timezone = ONTARIO_TIMEZONE): strin
 export const parseApiDate = (dateStr: string): Date => {
   return new Date(dateStr.replace(' ', 'T'));
 };
+
+// ============================================================================
+// REFUND REQUESTS
+// ============================================================================
+
+export enum RefundStatus {
+  PENDING = 'pending',
+  PROCESSED = 'processed',
+  REJECTED = 'rejected',
+  CANCELLED = 'cancelled'
+}
+
+export interface RefundRequest extends BaseEntity {
+  booking_id: number;
+  customer_id: number;
+  customer_name: string;
+  customer_email: string;
+  customer_phone_number: string;
+  customer_address: string;
+  payment_transaction_id: number;
+  amount: number; // in cents
+  refund_percentage: number;
+  request_date: string;
+  status: RefundStatus | string;
+  processed_at: string | null;
+  stripe_refund_id: string | null;
+  refund_reason: string;
+  metadata?: Record<string, any>;
+  admin_notes?: string | null;
+}
+
+export interface CreateRefundRequestRequest {
+  booking_id: number;
+  refund_reason: string;
+}
+
+export interface RefundRequestsResponse {
+  refunds: RefundRequest[];
+}
+
+export interface RefundRequestQueryParams {
+  limit?: number;
+  cursor?: string;
+  direction?: 'forward' | 'backward';
+  orderBy?: string;
+  orderDirection?: 'asc' | 'desc';
+  search?: string;
+  baseUrl?: string;
+}

@@ -88,7 +88,7 @@ export default function FAQPage() {
                 </svg>
               </div>
               <h3 className="font-medium mb-2">Call Us</h3>
-              <p className="text-gray-600 mb-2">+1 647-606-4519</p>
+              <p className="text-gray-600 mb-2">{"+1 (416) 407-4757"}</p>
               <p className="text-xs text-gray-500">7 days a week, 8am-8pm</p>
             </div>
             
@@ -100,7 +100,7 @@ export default function FAQPage() {
                 </svg>
               </div>
               <h3 className="font-medium mb-2">Email Us</h3>
-              <p className="text-gray-600 mb-2">help@elanroadtestrental.ca</p>
+              <p className="text-gray-600 mb-2">elan.drivetestrental@gmail.com</p>
               <p className="text-xs text-gray-500">{"We'll respond within 24 hours"}</p>
             </div>
           </div>

@@ -42,7 +42,7 @@ export default function BookingDetails() {
       setCurrentStep(2);
       hasSetCurrentStep.current = true;
     }
-  }, []); // Empty dependency array
+  }, [setCurrentStep]); // Empty dependency array
 
   // Check authentication status ONCE on mount
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function BookingDetails() {
       checkAuthStatus();
       hasCheckedAuth.current = true;
     }
-  }, []); // Empty dependency array
+  }, [checkAuthStatus]); // Empty dependency array
 
   // Redirect to first step if needed fields aren't set - ONCE
   useEffect(() => {
@@ -60,7 +60,7 @@ export default function BookingDetails() {
       }
       hasValidatedBooking.current = true;
     }
-  }, []); // Empty dependency array - check once on mount
+  }, [bookingState.testCenter, bookingState.testDate, bookingState.testTime, bookingState.testType, router]); // Empty dependency array - check once on mount
 
   // Update booking state when user is authenticated - ONCE per authentication
   useEffect(() => {
@@ -75,7 +75,7 @@ export default function BookingDetails() {
       setShowSuccessState(true);
       hasUpdatedUserDetails.current = true;
     }
-  }, [isAuthenticated, user]); // Only depend on auth state changes
+  }, [isAuthenticated, user, showSuccessState, updateBookingState]); // Only depend on auth state changes
 
   // Reset the user update flag when auth state changes
   useEffect(() => {

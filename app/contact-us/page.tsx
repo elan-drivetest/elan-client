@@ -1,8 +1,8 @@
 // app/contact-us/page.tsx
 import React from "react";
-import { MapPin, Phone, Mail, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { Clock, Mail, MapPin, Phone } from "lucide-react";
 
 export default function ContactPage() {
   return (
@@ -32,7 +32,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-medium mb-1">Phone</h3>
-                  <p className="text-gray-700">+1 647-606-4519</p>
+                  <p className="text-gray-700">{"+1 (416) 407-4757"}</p>
                   <p className="text-sm text-gray-500 mt-1">Monday to Sunday, 8am to 8pm</p>
                 </div>
               </div>
@@ -45,7 +45,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-medium mb-1">Email</h3>
-                  <p className="text-gray-700">help@elanroadtestrental.ca</p>
+                  <p className="text-gray-700">elan.drivetestrental@gmail.com</p>
                   <p className="text-sm text-gray-500 mt-1">{"We'll respond within 24 hours"}</p>
                 </div>
               </div>
@@ -58,7 +58,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-medium mb-1">Headquarters</h3>
-                  <p className="text-gray-700">123 Driving Avenue</p>
+                  {/* <p className="text-gray-700">123 Driving Avenue</p> */}
                   <p className="text-gray-700">Toronto, ON M5V 2H1</p>
                   <p className="text-gray-700">Canada</p>
                 </div>

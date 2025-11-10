@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { Check, Phone, Loader2, Clock, AlertCircle, Calendar, MapPin } from "lucide-react";
+import { Check, Phone, Loader2, Clock, AlertCircle, Calendar, MapPin, X, DollarSign } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import HelpCard from "@/components/booking/HelpCard";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { bookingApi } from "@/lib/api";
+import { useRefundRequest } from "@/lib/hooks/useBooking";
 import type { ApiResponse } from "@/lib/types/auth.types";
 
 type TabType = "Active" | "Completed";
@@ -62,12 +63,212 @@ interface Instructor {
   rating: number;
 }
 
+// Refund Request Modal Component
+const RefundRequestModal: React.FC<{
+  booking: APIBooking;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}> = ({ booking, isOpen, onClose, onSuccess }) => {
+  const { createRefundRequest, loading, error, success } = useRefundRequest();
+  const [refundReason, setRefundReason] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const formatPrice = (priceInCents: number): string => {
+    return new Intl.NumberFormat('en-CA', {
+      style: 'currency',
+      currency: 'CAD',
+    }).format(priceInCents / 100);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!refundReason.trim()) {
+      alert('Please provide a reason for the refund request');
+      return;
+    }
+
+    if (refundReason.trim().length < 10) {
+      alert('Please provide a more detailed reason (at least 10 characters)');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    // Prepare refund request data - ONLY booking_id and refund_reason
+    const refundData = {
+      booking_id: booking.id,
+      refund_reason: refundReason.trim(),
+    };
+
+    try {
+      const response = await createRefundRequest(refundData);
+
+      if (response.success) {
+        // Success - show confirmation and close modal
+        alert('Refund request submitted successfully! We will process your request within 3-5 business days.');
+        onSuccess();
+        onClose();
+        setRefundReason('');
+      } else {
+        alert(`Failed to submit refund request: ${response.error?.message || 'Unknown error'}`);
+      }
+    } catch {
+      alert('An error occurred while submitting your refund request. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-2xl font-bold text-gray-900">Request Refund</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Booking Summary */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="font-semibold mb-2">Booking Summary</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Booking ID:</span>
+                <span className="font-medium">#{booking.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Test Type:</span>
+                <span className="font-medium">{booking.test_type || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Test Date:</span>
+                <span className="font-medium">
+                  {booking.test_date
+                    ? new Date(booking.test_date).toLocaleDateString('en-CA', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })
+                    : 'TBD'
+                  }
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Amount Paid:</span>
+                <span className="font-medium">{formatPrice(booking.total_price)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Status:</span>
+                <span className="font-medium capitalize">{booking.status}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Refund Reason */}
+          <div>
+            <label htmlFor="refundReason" className="block text-sm font-medium text-gray-700 mb-2">
+              Reason for Refund Request <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              id="refundReason"
+              value={refundReason}
+              onChange={(e) => setRefundReason(e.target.value)}
+              rows={5}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent resize-none"
+              placeholder="Example: Unable to attend the test due to emergency"
+              required
+              minLength={10}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Please provide a detailed reason (minimum 10 characters). This will help us process your request faster.
+            </p>
+          </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-red-500" />
+                <span className="text-sm text-red-700">{error}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Success Display */}
+          {success && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Check className="h-5 w-5 text-green-500" />
+                <span className="text-sm text-green-700">Refund request submitted successfully!</span>
+              </div>
+            </div>
+          )}
+
+          {/* Refund Policy Notice */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-blue-900 mb-1">Important Information</h4>
+                <p className="text-sm text-blue-800">
+                  Your refund request will be reviewed by our team. Processing time is typically 3-5 business days.
+                  The refund amount will be determined based on our cancellation policy and the timing of your request.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+              className="flex-1"
+              disabled={isSubmitting || loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1 bg-[#0C8B44] hover:bg-[#0C8B44]/90 text-white"
+              disabled={isSubmitting || loading || !refundReason.trim()}
+            >
+              {isSubmitting || loading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Submitting...
+                </span>
+              ) : (
+                'Submit Refund Request'
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // Component for individual booking card
-const BookingCard: React.FC<{ 
-  booking: APIBooking; 
-  instructor: Instructor | null; 
+const BookingCard: React.FC<{
+  booking: APIBooking;
+  instructor: Instructor | null;
   isSearchingInstructor: boolean;
-}> = ({ booking, instructor, isSearchingInstructor }) => {
+  onRefundSuccess: () => void;
+}> = ({ booking, instructor, isSearchingInstructor, onRefundSuccess }) => {
+  const [showRefundModal, setShowRefundModal] = useState(false);
   
   const formatPrice = (priceInCents: number): string => {
     return new Intl.NumberFormat('en-CA', {
@@ -448,24 +649,27 @@ const BookingCard: React.FC<{
         </div>
       </div>
 
-      {/* Action buttons */}
-      {(booking.status === 'confirmed' || booking.status === 'succeeded') && (
-        <div className="flex gap-3">
-          <Button 
-            className="flex-1 bg-[#0C8B44] hover:bg-[#0C8B44]/90 text-white"
+      {/* Refund Request Button - Show for eligible bookings */}
+      {['confirmed', 'pending', 'succeeded'].includes(booking.status) && (
+        <div className="mt-3">
+          <Button
+            onClick={() => setShowRefundModal(true)}
+            variant="outline"
+            className="w-full flex items-center justify-center gap-2 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
           >
-            View Details
+            <DollarSign className="h-4 w-4" />
+            Request Refund
           </Button>
-          {booking.status === 'confirmed' && (
-            <Button 
-              variant="outline"
-              className="flex-1"
-            >
-              Reschedule
-            </Button>
-          )}
         </div>
       )}
+
+      {/* Refund Request Modal */}
+      <RefundRequestModal
+        booking={booking}
+        isOpen={showRefundModal}
+        onClose={() => setShowRefundModal(false)}
+        onSuccess={onRefundSuccess}
+      />
     </div>
   );
 };
@@ -675,13 +879,14 @@ export default function Bookings() {
               filteredBookings.map((booking) => {
                 const instructor = booking.instructor_id ? mockInstructors[booking.instructor_id] : null;
                 const isSearchingInstructor = !booking.instructor_id && ['pending', 'confirmed', 'succeeded'].includes(booking.status);
-                
+
                 return (
-                  <BookingCard 
-                    key={booking.id} 
-                    booking={booking} 
+                  <BookingCard
+                    key={booking.id}
+                    booking={booking}
                     instructor={instructor}
                     isSearchingInstructor={isSearchingInstructor}
+                    onRefundSuccess={fetchBookings}
                   />
                 );
               })

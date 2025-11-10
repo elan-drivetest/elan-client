@@ -37,7 +37,7 @@ export default function Payment() {
     if (calculatePricing) {
       calculatePricing();
     }
-  }, []); // Empty dependency array to prevent infinite loops
+  }, [calculatePricing, setCurrentStep]); // Empty dependency array to prevent infinite loops
 
   // Auto-populate user details from authenticated user - ONCE per auth change
   useEffect(() => {
@@ -47,26 +47,27 @@ export default function Payment() {
         email: user.email,
         phone: user.phone_number || ''
       };
-      
+
       // Only update if the data is actually different
       const currentUserDetails = bookingState.userDetails;
-      const hasChanged = !currentUserDetails || 
+      const hasChanged = !currentUserDetails ||
         currentUserDetails.fullName !== userDetails.fullName ||
         currentUserDetails.email !== userDetails.email ||
         currentUserDetails.phone !== userDetails.phone;
-        
+
       if (hasChanged) {
         updateBookingState({ userDetails });
       }
     }
-  }, [isAuthenticated, user?.full_name, user?.email, user?.phone_number]); // Depend on specific user properties
+  }, [isAuthenticated, user, bookingState.userDetails, updateBookingState]); // Depend on specific user properties
 
-  // Redirect if necessary fields aren't set - run only once on mount and when auth changes
+  // Redirect if user hasn't completed the booking-details step
   useEffect(() => {
-    if (!bookingState.userDetails?.email && !isAuthenticated) {
+    if (!bookingState.userDetails?.email) {
+      // User hasn't completed authentication, redirect to booking-details
       router.push("/book-road-test-vehicle/booking-details");
     }
-  }, [isAuthenticated]); // Only depend on auth status, not bookingState
+  }, [bookingState.userDetails?.email, router]);
 
   const handleApplyPromo = (code: string) => {
     console.log("Applying promo code:", code);
@@ -140,14 +141,14 @@ export default function Payment() {
   // Initialize component state once
   useEffect(() => {
     const initializeComponent = () => {
-      updateBookingState({ 
+      updateBookingState({
         bookingError: undefined,
         isCreatingBooking: false
       });
     };
-    
+
     initializeComponent();
-  }, []); // Run only once on mount
+  }, [updateBookingState]); // Run only once on mount
 
   // Helper function to truncate file name
   const truncateFileName = (fileName: string, maxLength: number = 25): string => {

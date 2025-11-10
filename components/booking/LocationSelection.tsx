@@ -84,19 +84,29 @@ export default function LocationSelection({
   // Use the address search hook
   const { results, loading: searchLoading, error: searchError, searchAddresses, clearResults } = useAddressSearch();
 
+  // Create the search function
+  const performSearch = useCallback(async (query: string) => {
+    if (query.length >= 3) {
+      await searchAddresses(query);
+      setShowSuggestions(true);
+    } else {
+      clearResults();
+      setShowSuggestions(false);
+    }
+  }, [searchAddresses, clearResults]);
+
+  // Use a ref to store the debounced function
+  const debouncedSearchRef = useRef(debounce(performSearch, 300));
+
+  // Update the debounced function when performSearch changes
+  useEffect(() => {
+    debouncedSearchRef.current = debounce(performSearch, 300);
+  }, [performSearch]);
+
   // Debounced search function
-  const debouncedSearch = useCallback(
-    debounce(async (query: string) => {
-      if (query.length >= 3) {
-        await searchAddresses(query);
-        setShowSuggestions(true);
-      } else {
-        clearResults();
-        setShowSuggestions(false);
-      }
-    }, 300),
-    [searchAddresses, clearResults]
-  );
+  const debouncedSearch = useCallback((query: string) => {
+    debouncedSearchRef.current(query);
+  }, []);
 
   // Handle input change with debounced search
   const handleLocationInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

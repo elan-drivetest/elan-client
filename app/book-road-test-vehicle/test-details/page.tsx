@@ -145,14 +145,16 @@ export default function TestDetails() {
         }
       });
     }
-  }, [isAuthenticated, user?.email, user?.full_name, user?.phone_number, bookingState.userDetails?.email, updateBookingState]);
+  }, [isAuthenticated, user, bookingState.userDetails?.email, updateBookingState]);
   
-  // Redirect if necessary fields aren't set
+  // Redirect to booking-details if user hasn't completed that step
+  // Don't check isAuthenticated directly - let booking-details handle auth
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!bookingState.userDetails?.email) {
+      // User hasn't completed the booking-details step, redirect them there
       router.push("/book-road-test-vehicle/booking-details");
     }
-  }, [isAuthenticated, router]);
+  }, [bookingState.userDetails?.email, router]);
   
   // Mock user data - use data from context if available
   const userData = {

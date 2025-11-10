@@ -12,7 +12,10 @@ import type {
   Booking,
   CreateBookingRequest,
   PricingBreakdown,
-  TestType} from '@/lib/types/booking.types';
+  TestType,
+  RefundRequest,
+  CreateRefundRequestRequest,
+  RefundRequestQueryParams} from '@/lib/types/booking.types';
 
 // ============================================================================
 // DRIVE TEST CENTERS HOOK
@@ -459,5 +462,127 @@ export const usePricingCalculation = () => {
     updateBasePrice,
     updatePickupPrice,
     resetPricing
+  };
+};
+
+// ============================================================================
+// REFUND REQUESTS HOOK
+// ============================================================================
+
+export const useRefundRequest = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [refundRequest, setRefundRequest] = useState<RefundRequest | null>(null);
+
+  const createRefundRequest = useCallback(async (refundData: CreateRefundRequestRequest): Promise<ApiResponse<RefundRequest>> => {
+    setLoading(true);
+    setError(null);
+    setSuccess(false);
+    setRefundRequest(null);
+
+    try {
+      // Validate refund data first
+      const validation = bookingApi.validateRefundRequestData(refundData);
+      if (!validation.isValid) {
+        setError(validation.errors.join(', '));
+        return {
+          success: false,
+          error: {
+            status_code: 400,
+            message: validation.errors.join(', ')
+          }
+        };
+      }
+
+      const response = await bookingApi.createRefundRequest(refundData);
+
+      if (response.success && response.data) {
+        setSuccess(true);
+        setRefundRequest(response.data);
+        return response;
+      } else {
+        setError(response.error?.message || 'Failed to create refund request');
+        return response;
+      }
+    } catch (err) {
+      const errorMessage = 'Network error occurred while creating refund request';
+      setError(errorMessage);
+      return {
+        success: false,
+        error: {
+          status_code: 500,
+          message: errorMessage
+        }
+      };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const resetState = useCallback(() => {
+    setLoading(false);
+    setError(null);
+    setSuccess(false);
+    setRefundRequest(null);
+  }, []);
+
+  return {
+    loading,
+    error,
+    success,
+    refundRequest,
+    createRefundRequest,
+    resetState
+  };
+};
+
+// ============================================================================
+// REFUND REQUESTS LIST HOOK
+// ============================================================================
+
+export const useRefundRequests = (params?: RefundRequestQueryParams) => {
+  const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRefundRequests = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await bookingApi.getRefundRequests(params);
+
+      if (response.success && response.data) {
+        setRefundRequests(response.data);
+      } else {
+        setError(response.error?.message || 'Failed to fetch refund requests');
+      }
+    } catch (err) {
+      setError('Network error occurred while fetching refund requests');
+    } finally {
+      setLoading(false);
+    }
+  }, [params]);
+
+  useEffect(() => {
+    fetchRefundRequests();
+  }, [fetchRefundRequests]);
+
+  const getRefundRequestById = useCallback((id: number): RefundRequest | undefined => {
+    return refundRequests.find(request => request.id === id);
+  }, [refundRequests]);
+
+  const getRefundRequestsByStatus = useCallback((status: string): RefundRequest[] => {
+    return refundRequests.filter(request => request.status === status);
+  }, [refundRequests]);
+
+  return {
+    refundRequests,
+    loading,
+    error,
+    refetch: fetchRefundRequests,
+    getRefundRequestById,
+    getRefundRequestsByStatus
   };
 };

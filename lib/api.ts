@@ -14,7 +14,9 @@ import { bookingService } from '@/lib/services/booking.service';
 import type {
   Addon,
   Coupon,
-  CreateBookingRequest} from '@/lib/types/booking.types';
+  CreateBookingRequest,
+  CreateRefundRequestRequest,
+  RefundRequestQueryParams} from '@/lib/types/booking.types';
 
 // Create the main API client
 const api = axios.create({
@@ -352,11 +354,11 @@ export const bookingApi = {
   createBooking: (bookingData: CreateBookingRequest) => bookingService.createBooking(bookingData),
   
   // Distance Calculation - NEW BACKEND API
-  calculateDistanceAPI: (pickupLat: number, pickupLng: number, testCenterLat: number, testCenterLng: number) => 
+  calculateDistanceAPI: (pickupLat: number, pickupLng: number, testCenterLat: number, testCenterLng: number) =>
     bookingService.calculateDistanceAPI(pickupLat, pickupLng, testCenterLat, testCenterLng),
-  
+
   // Utility methods
-  calculateDistance: (pickup: { lat: number; lng: number }, testCenter: { lat: number; lng: number }) => 
+  calculateDistance: (pickup: { lat: number; lng: number }, testCenter: { lat: number; lng: number }) =>
     bookingService.calculateDistance(pickup, testCenter),
   calculatePricingBreakdown: (params: {
     basePrice: number;
@@ -366,6 +368,12 @@ export const bookingApi = {
     coupon?: Coupon | null;
   }) => bookingService.calculatePricingBreakdown(params),
   validateBookingData: (data: CreateBookingRequest) => bookingService.validateBookingData(data),
+
+  // Refund Requests
+  createRefundRequest: (refundData: CreateRefundRequestRequest) => bookingService.createRefundRequest(refundData),
+  getRefundRequests: (params?: RefundRequestQueryParams) => bookingService.getRefundRequests(params),
+  getRefundRequestById: (id: number) => bookingService.getRefundRequestById(id),
+  validateRefundRequestData: (data: CreateRefundRequestRequest) => bookingService.validateRefundRequestData(data),
 };
 
 // Export the booking service instance for direct access if needed

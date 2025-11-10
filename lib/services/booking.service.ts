@@ -61,15 +61,15 @@ class BookingApiService {
       },
       async (error: AxiosError) => {
         console.error('❌ Booking API Error:', error.response?.status, error.response?.data);
-        
-        // Handle 401 unauthorized errors
-        if (error.response?.status === 401) {
-          console.log('🚨 401 Unauthorized - redirecting to login');
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-          }
-        }
-        
+
+        // REMOVED: Auto-redirect to /login on 401 errors
+        // This was causing issues with the booking flow where users
+        // were being redirected before they had a chance to authenticate
+        // in Step 2 (Booking Details)
+
+        // Let individual pages handle authentication requirements
+        // instead of forcing a global redirect
+
         return Promise.reject(error);
       }
     );
@@ -643,6 +643,74 @@ class BookingApiService {
 
     if (!data.timezone) {
       errors.push('Timezone is required');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  // ============================================================================
+  // REFUND REQUESTS
+  // ============================================================================
+
+  /**
+   * Create a new refund request
+   */
+  async createRefundRequest(refundData: any): Promise<ApiResponse<any>> {
+    try {
+      console.log('🔄 Creating refund request:', refundData);
+      const response = await this.apiClient.post<any>('/refund-requests', refundData);
+      return this.createSuccessResponse(response.data, 'Refund request created successfully');
+    } catch (error) {
+      const apiError = this.handleApiError(error);
+      return this.createErrorResponse(apiError);
+    }
+  }
+
+  /**
+   * Get all refund requests with optional filtering
+   */
+  async getRefundRequests(params?: any): Promise<ApiResponse<any[]>> {
+    try {
+      const response = await this.apiClient.get<any[]>('/refund-requests', { params });
+      return this.createSuccessResponse(response.data, 'Refund requests fetched successfully');
+    } catch (error) {
+      const apiError = this.handleApiError(error);
+      return this.createErrorResponse(apiError);
+    }
+  }
+
+  /**
+   * Get a specific refund request by ID
+   */
+  async getRefundRequestById(id: number): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.apiClient.get<any>(`/refund-requests/${id}`);
+      return this.createSuccessResponse(response.data, 'Refund request fetched successfully');
+    } catch (error) {
+      const apiError = this.handleApiError(error);
+      return this.createErrorResponse(apiError);
+    }
+  }
+
+  /**
+   * Validate refund request data before submission
+   */
+  validateRefundRequestData(data: any): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!data.booking_id) {
+      errors.push('Booking ID is required');
+    }
+
+    if (!data.refund_reason || data.refund_reason.trim().length === 0) {
+      errors.push('Refund reason is required');
+    }
+
+    if (data.refund_reason && data.refund_reason.trim().length < 10) {
+      errors.push('Refund reason must be at least 10 characters');
     }
 
     return {

@@ -147,7 +147,7 @@ const HowItWorksPage = () => {
             </Link>
             <Button variant="outline" size="lg" className="border-white text-white bg-transparent hover:bg-white/10">
               <Phone className="mr-2 h-5 w-5" />
-              Call Us: +1-647-606-4519
+              {"Call Us: +1 (416) 407-4757"}
             </Button>
           </div>
         </div>

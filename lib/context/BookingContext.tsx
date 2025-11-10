@@ -183,10 +183,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   }, [currentStep]);
 
   // Update booking state with API pricing sync
-  const updateBookingState = (updates: Partial<BookingState>) => {
+  const updateBookingState = useCallback((updates: Partial<BookingState>) => {
     setBookingState(prevState => {
       const newState = { ...prevState, ...updates };
-      
+
       // Sync legacy pricing with API pricing if needed
       if (updates.apiPricing && !updates.pricing) {
         newState.pricing = {
@@ -197,10 +197,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
           total: updates.apiPricing.total_price / 100
         };
       }
-      
+
       return newState;
     });
-  };
+  }, []);
 
   // Function to reset booking state
   const resetBookingState = () => {
@@ -243,7 +243,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error calculating pricing:', error);
     }
-  }, [bookingState.testCenter, bookingState.pickupDistance, bookingState.locationOption, bookingState.selectedAddonData, bookingState.appliedCoupon, updateBookingState]);
+  }, [bookingState, updateBookingState]);
 
   // Transform booking state to API format
   const transformToApiFormat = (): CreateBookingRequest | null => {

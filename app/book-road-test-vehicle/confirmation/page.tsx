@@ -28,7 +28,7 @@ export default function Confirmation() {
       }
       hasInitialized.current = true;
     }
-  }, []); // Empty dependency array to prevent infinite loops
+  }, [calculatePricing, setCurrentStep]); // Empty dependency array to prevent infinite loops
   
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleApplyPromo = (code: string) => {
