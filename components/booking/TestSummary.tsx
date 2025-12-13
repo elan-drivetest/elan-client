@@ -313,15 +313,15 @@ export default function TestSummary({
     return `${bookingState.pickupDistance.toFixed(1)}km from Test Centre`;
   };
 
-  // Calculate pickup price based on actual distance
-  const calculatePickupPrice = (): number => {
-    if (bookingState.locationOption === 'pickup' && bookingState.pickupDistance) {
-      const distance = bookingState.pickupDistance;
-      if (distance <= 50) {
-        return Math.round(distance * 100); // $1/km in cents
-      } else {
-        return Math.round((50 * 100) + ((distance - 50) * 50)); // First 50km + $0.50/km for rest
-      }
+  // Get pickup price from booking state (already calculated correctly)
+  const getPickupPrice = (): number => {
+    // Use the price from apiPricing if available (most accurate)
+    if (bookingState.apiPricing?.pickup_price !== undefined) {
+      return bookingState.apiPricing.pickup_price;
+    }
+    // Fallback to legacy pricing format
+    if (bookingState.pricing?.pickupPrice !== undefined) {
+      return bookingState.pricing.pickupPrice * 100; // Convert dollars to cents
     }
     return 0;
   };
@@ -337,13 +337,13 @@ export default function TestSummary({
   // Generate payment breakdown with proper upgrade logic
   const generatePaymentBreakdown = (): PaymentBreakdownItem[] => {
     const breakdown: PaymentBreakdownItem[] = [];
-    
-    // Use real base price from selected test center
-    const realBasePrice = getRealBasePrice();
-    
-    // Calculate pickup price using actual distance
-    const pickupPriceInCents = calculatePickupPrice();
-    
+
+    // Use real base price from selected test center or API pricing
+    const realBasePrice = bookingState.apiPricing?.base_price || getRealBasePrice();
+
+    // Get pickup price from booking state (already calculated correctly)
+    const pickupPriceInCents = getPickupPrice();
+
     // Calculate add-on price using real API data
     const addOnPriceInCents = calculateAddOnPrice();
 
@@ -583,13 +583,10 @@ export default function TestSummary({
         <div className="mb-6">
           <h3 className="text-sm font-medium mb-2">Payment Breakdown</h3>
           <div className="space-y-3">
-            {generatePaymentBreakdown().map((item, index) => (
-              <div 
-                key={index} 
-                className={cn(
-                  "flex justify-between items-center",
-                  item.isTotal && "pt-2 border-t border-gray-200 font-medium"
-                )}
+            {generatePaymentBreakdown().filter(item => !item.isTotal).map((item, index) => (
+              <div
+                key={index}
+                className="flex justify-between items-center"
               >
                 <span className={cn(
                   "text-sm",
@@ -598,10 +595,9 @@ export default function TestSummary({
                 )}>
                   {item.label}
                 </span>
-                <span 
+                <span
                   className={cn(
                     "text-sm",
-                    item.isTotal && "text-[#0C8B44] font-medium",
                     item.isFree && "text-[#0C8B44]",
                     item.isDiscount && "text-red-500"
                   )}
@@ -612,17 +608,34 @@ export default function TestSummary({
             ))}
           </div>
         </div>
-        
+
         {/* FIXED: Add-ons selection in summary with proper mutual exclusion */}
         {toggleAddOn && onRemoveAddOn && !isConfirmationPage && (
-          <SummaryAddOns 
+          <SummaryAddOns
             selectedAddOn={summaryAddOnProps.selectedAddOn ?? null}
             toggleAddOn={toggleAddOn}
             onRemove={onRemoveAddOn}
             freeAddOn={summaryAddOnProps.freeAddOn}
           />
         )}
-        
+
+        {/* Total Payment - shown after add-ons selection */}
+        <div className="mb-6">
+          {generatePaymentBreakdown().filter(item => item.isTotal).map((item, index) => (
+            <div
+              key={index}
+              className="flex justify-between items-center pt-3 border-t border-gray-200"
+            >
+              <span className="text-base font-semibold">
+                {item.label}
+              </span>
+              <span className="text-lg font-bold text-[#0C8B44]">
+                {item.price}
+              </span>
+            </div>
+          ))}
+        </div>
+
         <HelpCard />
         <RatingBar />
       </div>

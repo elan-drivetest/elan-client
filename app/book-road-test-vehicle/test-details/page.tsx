@@ -31,13 +31,14 @@ export type AddOnType = 'mock-test' | 'driving-lesson' | null;
 export default function TestDetails() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const { 
-    bookingState, 
-    updateBookingState, 
+  const {
+    bookingState,
+    updateBookingState,
     setCurrentStep,
     addons,
     isLoadingAddons,
-    testCenters
+    testCenters,
+    calculatePricing
   } = useBooking();
   
   // File upload hooks
@@ -126,11 +127,43 @@ export default function TestDetails() {
     return lessonAddon || null;
   };
   
+  // Use ref to track pricing calculation
+  const lastPricingStateRef = useRef<string>('');
+
   // Set current step - FIXED: No dependencies to prevent infinite renders
   useEffect(() => {
     setCurrentStep(3);
   }, [setCurrentStep]);
-  
+
+  // Recalculate pricing when relevant primitive values change
+  useEffect(() => {
+    // Create a stable key from primitive values only
+    const pricingKey = JSON.stringify({
+      testCenterId: bookingState.testCenterId,
+      pickupDistance: bookingState.pickupDistance,
+      locationOption: bookingState.locationOption,
+      selectedAddOn: bookingState.selectedAddOn,
+      couponCode: bookingState.couponCode,
+      addonId: bookingState.selectedAddonData?.id
+    });
+
+    // Only recalculate if the key has changed
+    if (pricingKey !== lastPricingStateRef.current) {
+      lastPricingStateRef.current = pricingKey;
+      if (calculatePricing) {
+        calculatePricing();
+      }
+    }
+  }, [
+    bookingState.testCenterId,
+    bookingState.pickupDistance,
+    bookingState.locationOption,
+    bookingState.selectedAddOn,
+    bookingState.couponCode,
+    bookingState.selectedAddonData?.id,
+    calculatePricing
+  ]);
+
   // Auto-populate user details from authenticated user - FIXED: Proper dependencies
   const hasUpdatedUserDetails = useRef(false);
 
@@ -614,11 +647,23 @@ export default function TestDetails() {
           <div className="mb-8">
             <button
               onClick={handleContinue}
-              disabled={isUploadingRoadTest || isUploadingLicense}
+              disabled={isUploadingRoadTest || isUploadingLicense || !roadTestDocUrl || !licenseDocUrl}
               className="w-full py-3 bg-[#0C8B44] hover:bg-[#0A7A3C] disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-md font-medium transition-colors"
             >
               {(isUploadingRoadTest || isUploadingLicense) ? 'Uploading...' : 'Continue'}
             </button>
+
+            {/* Show message if documents are missing */}
+            {!roadTestDocUrl || !licenseDocUrl ? (
+              <p className="text-sm text-gray-500 text-center mt-2">
+                {!roadTestDocUrl && !licenseDocUrl
+                  ? "Please upload both required documents to continue"
+                  : !roadTestDocUrl
+                    ? "Please upload your G2/G Road Test Booking Confirmation"
+                    : "Please upload your Ontario License"
+                }
+              </p>
+            ) : null}
           </div>
         </div>
         

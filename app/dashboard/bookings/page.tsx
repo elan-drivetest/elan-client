@@ -32,7 +32,8 @@ interface APIBooking {
   timezone: string;
   road_test_doc_url?: string;
   g1_license_doc_url?: string;
-  
+  payment_url?: string; // Stripe checkout URL for pending payments (actual field name from API)
+
   // Fields from API documentation that may be missing in actual response
   user_id?: number;
   full_name?: string;
@@ -649,9 +650,50 @@ const BookingCard: React.FC<{
         </div>
       </div>
 
-      {/* Refund Request Button - Show for eligible bookings */}
-      {['confirmed', 'pending', 'succeeded'].includes(booking.status) && (
+      {/* Complete Payment Button - Show for pending bookings with payment URL */}
+      {booking.status === 'pending' && booking.payment_url && (
         <div className="mt-3">
+          <Button
+            onClick={() => {
+              console.log('🔗 Redirecting to payment URL:', booking.payment_url);
+              window.location.href = booking.payment_url!;
+            }}
+            className="w-full flex items-center justify-center gap-2 bg-[#0C8B44] hover:bg-[#0A7A3C] text-white"
+          >
+            <DollarSign className="h-4 w-4" />
+            Complete Payment
+          </Button>
+        </div>
+      )}
+
+      {/* Refund Request Button - Show for eligible bookings (except pending with checkout URL) */}
+      {['confirmed', 'succeeded'].includes(booking.status) && (
+        <div className="mt-3">
+          <Button
+            onClick={() => setShowRefundModal(true)}
+            variant="outline"
+            className="w-full flex items-center justify-center gap-2 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+          >
+            <DollarSign className="h-4 w-4" />
+            Request Refund
+          </Button>
+        </div>
+      )}
+
+      {/* Show warning for pending bookings without payment URL */}
+      {booking.status === 'pending' && !booking.payment_url && (
+        <div className="mt-3">
+          <div className="mb-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-yellow-800">Payment Pending</p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  Your booking is awaiting payment confirmation. If you didn&apos;t complete the payment, please contact support.
+                </p>
+              </div>
+            </div>
+          </div>
           <Button
             onClick={() => setShowRefundModal(true)}
             variant="outline"
@@ -707,10 +749,21 @@ export default function Bookings() {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response: ApiResponse<APIBooking[]> = await bookingApi.getBookings();
-      
+
       if (response.success && response.data) {
+        console.log('📊 Fetched bookings:', response.data);
+
+        // Debug: Check if any pending bookings have payment_url
+        const pendingBookings = response.data.filter(b => b.status === 'pending');
+        if (pendingBookings.length > 0) {
+          console.log('⏳ Pending bookings:', pendingBookings);
+          pendingBookings.forEach(booking => {
+            console.log(`Booking #${booking.id} - Status: ${booking.status}, payment_url:`, booking.payment_url);
+          });
+        }
+
         setBookings(response.data);
       } else {
         setError(response.error?.message || 'Failed to fetch bookings');

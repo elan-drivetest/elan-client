@@ -29,6 +29,8 @@ export default function BookingDetails() {
   const [showLogin, setShowLogin] = useState(false);
   const [errors, setErrors] = useState({ general: "" });
   const [showSuccessState, setShowSuccessState] = useState(false);
+  const [showEmailVerificationNotice, setShowEmailVerificationNotice] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
   
   // Use refs to prevent infinite re-renders
   const hasSetCurrentStep = useRef(false);
@@ -81,6 +83,9 @@ export default function BookingDetails() {
   useEffect(() => {
     if (!isAuthenticated) {
       hasUpdatedUserDetails.current = false;
+    } else {
+      // Hide email verification notice when user is authenticated
+      setShowEmailVerificationNotice(false);
     }
   }, [isAuthenticated]);
 
@@ -106,9 +111,12 @@ export default function BookingDetails() {
       const result = await authApi.register(apiData);
       
       if (result.success) {
-        console.log('✅ Registration successful');
-        
-        // Store user data in booking state
+        console.log('✅ Registration successful - email verification required');
+
+        // Store email for the verification notice
+        setRegisteredEmail(data.email);
+
+        // Store user data in booking state (but user is not authenticated yet)
         updateBookingState({
           userDetails: {
             fullName: data.fullName,
@@ -116,9 +124,9 @@ export default function BookingDetails() {
             phone: data.phone || "",
           }
         });
-        
-        // Show success state instead of auto-redirecting
-        setShowSuccessState(true);
+
+        // Show email verification notice instead of success state
+        setShowEmailVerificationNotice(true);
       } else {
         // Handle API errors
         const errorMessage = handleApiError(result.error);
@@ -186,10 +194,11 @@ export default function BookingDetails() {
   const toggleAuthMode = () => {
     setShowLogin(!showLogin);
     setErrors({ general: "" }); // Clear errors when switching
+    setShowEmailVerificationNotice(false); // Hide verification notice when switching
   };
 
-  // Show success state with user info and next button
-  if (showSuccessState && (isAuthenticated || bookingState.userDetails?.email)) {
+  // Show success state with user info and next button (only if authenticated)
+  if (showSuccessState && isAuthenticated) {
     const userDetails = bookingState.userDetails;
     
     return (
@@ -254,6 +263,48 @@ export default function BookingDetails() {
           {errors.general && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-700">{errors.general}</p>
+            </div>
+          )}
+
+          {/* Show email verification notice after signup */}
+          {showEmailVerificationNotice && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <svg
+                  className="flex-shrink-0 mt-0.5 text-blue-600"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <h3 className="text-lg font-medium text-blue-900 mb-2">
+                    Check your email to verify your account
+                  </h3>
+                  <p className="text-sm text-blue-800 mb-3">
+                    We&apos;ve sent a verification link to <strong>{registeredEmail}</strong>.
+                    Please check your inbox and click the link to verify your email and continue with your booking.
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Didn&apos;t receive the email? Check your spam folder or{" "}
+                    <button
+                      onClick={toggleAuthMode}
+                      className="underline hover:no-underline font-medium bg-transparent border-none p-0 cursor-pointer"
+                    >
+                      try logging in
+                    </button>
+                    {" "}if you already verified.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 

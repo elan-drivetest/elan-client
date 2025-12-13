@@ -1,7 +1,7 @@
 // app/book-road-test-vehicle/payment/page.tsx
 "use client"
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/context/BookingContext";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -31,42 +31,51 @@ export default function Payment() {
   
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Set current step and calculate pricing ONCE - fix infinite re-rendering
+  // Use refs to prevent infinite re-renders
+  const hasSetCurrentStep = useRef(false);
+  const hasCheckedRedirect = useRef(false);
+  const hasInitializedState = useRef(false);
+  const hasPopulatedUserDetails = useRef(false);
+
+  // Set current step and calculate pricing ONCE
   useEffect(() => {
-    setCurrentStep(4);
-    if (calculatePricing) {
-      calculatePricing();
+    if (!hasSetCurrentStep.current) {
+      setCurrentStep(4);
+      if (calculatePricing) {
+        calculatePricing();
+      }
+      hasSetCurrentStep.current = true;
     }
-  }, [calculatePricing, setCurrentStep]); // Empty dependency array to prevent infinite loops
+  }, [calculatePricing, setCurrentStep]);
 
   // Auto-populate user details from authenticated user - ONCE per auth change
   useEffect(() => {
-    if (isAuthenticated && user && !bookingState.userDetails?.email) {
+    if (isAuthenticated && user && !bookingState.userDetails?.email && !hasPopulatedUserDetails.current) {
       const userDetails = {
         fullName: user.full_name || '',
         email: user.email,
         phone: user.phone_number || ''
       };
 
-      // Only update if the data is actually different
-      const currentUserDetails = bookingState.userDetails;
-      const hasChanged = !currentUserDetails ||
-        currentUserDetails.fullName !== userDetails.fullName ||
-        currentUserDetails.email !== userDetails.email ||
-        currentUserDetails.phone !== userDetails.phone;
-
-      if (hasChanged) {
-        updateBookingState({ userDetails });
-      }
+      updateBookingState({ userDetails });
+      hasPopulatedUserDetails.current = true;
     }
-  }, [isAuthenticated, user, bookingState.userDetails, updateBookingState]); // Depend on specific user properties
+  }, [isAuthenticated, user, bookingState.userDetails?.email, updateBookingState]);
 
-  // Redirect if user hasn't completed the booking-details step
+  // Reset the populated flag when user logs out
   useEffect(() => {
-    if (!bookingState.userDetails?.email) {
+    if (!isAuthenticated) {
+      hasPopulatedUserDetails.current = false;
+    }
+  }, [isAuthenticated]);
+
+  // Redirect if user hasn't completed the booking-details step - check ONCE
+  useEffect(() => {
+    if (!bookingState.userDetails?.email && !hasCheckedRedirect.current) {
       // User hasn't completed authentication, redirect to booking-details
       router.push("/book-road-test-vehicle/booking-details");
     }
+    hasCheckedRedirect.current = true;
   }, [bookingState.userDetails?.email, router]);
 
   const handleApplyPromo = (code: string) => {
@@ -140,15 +149,15 @@ export default function Payment() {
 
   // Initialize component state once
   useEffect(() => {
-    const initializeComponent = () => {
+    if (!hasInitializedState.current) {
       updateBookingState({
         bookingError: undefined,
         isCreatingBooking: false
       });
-    };
-
-    initializeComponent();
-  }, [updateBookingState]); // Run only once on mount
+      hasInitializedState.current = true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Helper function to truncate file name
   const truncateFileName = (fileName: string, maxLength: number = 25): string => {

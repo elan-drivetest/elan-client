@@ -216,6 +216,7 @@ export interface Booking extends BaseEntity {
   addon_duration?: number; // in seconds
   road_test_doc_url: string;
   g1_license_doc_url: string;
+  payment_url?: string; // Stripe checkout URL for pending payments (actual field name from API)
 }
 
 export interface CreateBookingRequest {
@@ -243,8 +244,10 @@ export interface BookingsResponse {
 }
 
 export interface CreateBookingResponse {
-  booking: Booking;
-  message: string;
+  booking?: Booking;
+  checkout_url?: string; // Stripe checkout URL (can be named checkout_url or payment_url depending on endpoint)
+  payment_url?: string; // Alternative field name for Stripe checkout URL
+  message?: string;
 }
 
 // ============================================================================

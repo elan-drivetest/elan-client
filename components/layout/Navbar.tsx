@@ -37,6 +37,7 @@ const Navbar = () => {
     if (isLoading) {
       return (
         <div className="flex items-center space-x-2">
+          <div className="w-28 h-8 bg-gray-200 rounded animate-pulse"></div>
           <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
           <div className="w-20 h-8 bg-gray-200 rounded animate-pulse"></div>
         </div>
@@ -47,11 +48,13 @@ const Navbar = () => {
     if (isAuthenticated && user) {
       return (
         <div className="flex items-center space-x-2">
-          {/* Dashboard button for larger screens */}
-          <Link href="/dashboard" className="hidden sm:inline-flex">
-            <Button variant="outline" size="sm" className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
+          {/* Book Car for Road Test button */}
+          <Link href="/book-road-test-vehicle/road-test-details">
+            <Button
+              size="sm"
+              className="bg-[#0C8B44] hover:bg-[#0C8B44]/90 text-white"
+            >
+              Book Car for Road Test
             </Button>
           </Link>
 
@@ -70,32 +73,32 @@ const Navbar = () => {
                 <p className="text-gray-500 text-xs">{user.email}</p>
               </div>
               <DropdownMenuSeparator />
-              
-              {/* Dashboard link for mobile */}
-              <DropdownMenuItem asChild className="sm:hidden">
+
+              {/* Dashboard link - now always visible */}
+              <DropdownMenuItem asChild>
                 <Link href="/dashboard" className="flex items-center gap-2">
                   <LayoutDashboard className="h-4 w-4" />
                   Dashboard
                 </Link>
               </DropdownMenuItem>
-              
+
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/profile" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
                   Profile
                 </Link>
               </DropdownMenuItem>
-              
+
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/bookings" className="flex items-center gap-2">
                   <LayoutDashboard className="h-4 w-4" />
                   My Bookings
                 </Link>
               </DropdownMenuItem>
-              
+
               <DropdownMenuSeparator />
-              
-              <DropdownMenuItem 
+
+              <DropdownMenuItem
                 onClick={handleLogout}
                 disabled={isLoggingOut}
                 className="flex items-center gap-2 text-red-600 focus:text-red-600"
@@ -112,14 +115,24 @@ const Navbar = () => {
     // Show login/signup buttons for unauthenticated users
     return (
       <div className="flex items-center space-x-2">
+        {/* Book Car for Road Test button */}
+        <Link href="/book-road-test-vehicle/road-test-details">
+          <Button
+            size="sm"
+            className="bg-[#0C8B44] hover:bg-[#0C8B44]/90 text-white"
+          >
+            Book Car for Road Test
+          </Button>
+        </Link>
+
         <Link href="/login">
           <Button variant="outline" size="sm" className="hidden sm:inline-flex">
             Log in
           </Button>
         </Link>
         <Link href="/signup">
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             className="bg-[#0C8B44] hover:bg-[#0C8B44]/90 text-white"
           >
             Sign up

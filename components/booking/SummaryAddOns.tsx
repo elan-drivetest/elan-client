@@ -82,17 +82,6 @@ export default function SummaryAddOns({
           </div>
         )}
       </div>
-      
-      {(selectedAddOn || freeAddOn) && (
-        <div className="mt-4 flex justify-between items-center text-[#0C8B44] font-medium">
-          <div>
-            Total Payment
-          </div>
-          <div>
-            $ 180.00 CAD
-          </div>
-        </div>
-      )}
     </div>
   );
 }
