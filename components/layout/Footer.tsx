@@ -16,7 +16,6 @@ const Footer = () => {
             <ul className="space-y-2">
               <li><Link href="/testimonials" className="text-sm hover:text-[#0C8B44]">Testimonials</Link></li>
               <li><Link href="/our-plans" className="text-sm hover:text-[#0C8B44]">Our Plans</Link></li>
-              <li><Link href="/best-package" className="text-sm hover:text-[#0C8B44]">Best Tour Package</Link></li>
             </ul>
           </div>
           
@@ -24,10 +23,10 @@ const Footer = () => {
           <div>
             <h3 className="font-medium text-sm text-[#0C8B44] mb-4">Elan Quick Links</h3>
             <ul className="space-y-2">
-              <li><Link href="/custom-links" className="text-sm hover:text-[#0C8B44]">Custom Links</Link></li>
-              <li><Link href="/custom-links" className="text-sm hover:text-[#0C8B44]">Custom Links</Link></li>
-              <li><Link href="/custom-links" className="text-sm hover:text-[#0C8B44]">Custom Links</Link></li>
-              <li><Link href="/custom-links" className="text-sm hover:text-[#0C8B44]">Custom Links</Link></li>
+              <li><Link href="/book-road-test-vehicle/road-test-details" className="text-sm hover:text-[#0C8B44]">Book a Test</Link></li>
+              <li><Link href="/how-it-works" className="text-sm hover:text-[#0C8B44]">How It Works</Link></li>
+              <li><Link href="/faq" className="text-sm hover:text-[#0C8B44]">FAQs</Link></li>
+              <li><Link href="/contact-us" className="text-sm hover:text-[#0C8B44]">Contact Us</Link></li>
             </ul>
           </div>
           
@@ -53,37 +52,24 @@ const Footer = () => {
         </div>
         
         {/* Social media section */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-          {/* Repeat Customers column */}
-          <div>
-            <h3 className="font-medium text-sm text-[#0C8B44] mb-4">Customers</h3>
-            <ul className="space-y-2">
-              <li><Link href="/testimonials" className="text-sm hover:text-[#0C8B44]">Testimonials</Link></li>
-              <li><Link href="/our-plans" className="text-sm hover:text-[#0C8B44]">Our Plans</Link></li>
-              <li><Link href="/best-package" className="text-sm hover:text-[#0C8B44]">Best Tour Package</Link></li>
-            </ul>
-          </div>
-          
-          {/* Social media icons */}
-          <div className="md:col-span-3">
-            <h3 className="font-medium text-sm text-[#0C8B44] mb-4">Socials</h3>
-            <div className="flex space-x-4">
-              <Link href="https://www.facebook.com/elanroadtestrental" aria-label="Facebook" className="text-gray-600 hover:text-[#0C8B44]">
-                <FaFacebookF size={20} />
-              </Link>
-              <Link href="https://www.instagram.com/elanroadtestrental" aria-label="Instagram" className="text-gray-600 hover:text-[#0C8B44]">
-                <FaInstagram size={20} />
-              </Link>
-              {/* <Link href="https://twitter.com" aria-label="Twitter" className="text-gray-600 hover:text-[#0C8B44]">
-                <FaTwitter size={20} />
-              </Link> */}
-              <Link href="https://www.youtube.com/@GrayJaysDrivingSchool" aria-label="YouTube" className="text-gray-600 hover:text-[#0C8B44]">
-                <FaYoutube size={20} />
-              </Link>
-              <Link href="https://www.tiktok.com/@elanroadtestcarsolutions" aria-label="YouTube" className="text-gray-600 hover:text-[#0C8B44]">
-                <FaTiktok size={20} />
-              </Link>
-            </div>
+        <div className="mb-12">
+          <h3 className="font-medium text-sm text-[#0C8B44] mb-4">Socials</h3>
+          <div className="flex space-x-4">
+            <Link href="https://www.facebook.com/elanroadtestrental" aria-label="Facebook" className="text-gray-600 hover:text-[#0C8B44]">
+              <FaFacebookF size={20} />
+            </Link>
+            <Link href="https://www.instagram.com/elanroadtestrental" aria-label="Instagram" className="text-gray-600 hover:text-[#0C8B44]">
+              <FaInstagram size={20} />
+            </Link>
+            {/* <Link href="https://twitter.com" aria-label="Twitter" className="text-gray-600 hover:text-[#0C8B44]">
+              <FaTwitter size={20} />
+            </Link> */}
+            <Link href="https://www.youtube.com/@GrayJaysDrivingSchool" aria-label="YouTube" className="text-gray-600 hover:text-[#0C8B44]">
+              <FaYoutube size={20} />
+            </Link>
+            <Link href="https://www.tiktok.com/@elanroadtestcarsolutions" aria-label="TikTok" className="text-gray-600 hover:text-[#0C8B44]">
+              <FaTiktok size={20} />
+            </Link>
           </div>
         </div>
         
