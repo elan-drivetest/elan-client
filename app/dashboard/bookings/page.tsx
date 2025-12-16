@@ -369,22 +369,22 @@ const BookingCard: React.FC<{
     if (booking.meet_at_center === true) {
       return null; // User is meeting at center
     }
-    
+
     if (booking.pickup_address) {
       return {
         address: booking.pickup_address,
-        distance: booking.pickup_distance || 0
+        distance: typeof booking.pickup_distance === 'number' ? booking.pickup_distance : parseFloat(String(booking.pickup_distance || 0)) || 0
       };
     }
-    
+
     // If pickup_price > 0 but no address, assume pickup service was selected
     if (booking.pickup_price > 0) {
       return {
         address: 'Pickup address TBD',
-        distance: booking.pickup_distance || 0
+        distance: typeof booking.pickup_distance === 'number' ? booking.pickup_distance : parseFloat(String(booking.pickup_distance || 0)) || 0
       };
     }
-    
+
     return null;
   };
 
