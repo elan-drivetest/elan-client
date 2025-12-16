@@ -27,6 +27,31 @@ const api = axios.create({
   },
 });
 
+// Track if we're currently refreshing to prevent multiple simultaneous refresh attempts
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (value?: unknown) => void;
+  reject: (reason?: unknown) => void;
+}> = [];
+
+const processQueue = (error: unknown = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve();
+    }
+  });
+
+  failedQueue = [];
+};
+
+// Helper to check if refresh token cookie exists
+const hasRefreshToken = (): boolean => {
+  if (typeof document === 'undefined') return false;
+  return document.cookie.includes('_elanAuthR=');
+};
+
 // Request interceptor for debugging and cookie handling
 api.interceptors.request.use(
   (config) => {
@@ -43,7 +68,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for handling common errors and cookie debugging
+// Response interceptor for handling common errors and automatic token refresh
 api.interceptors.response.use(
   (response) => {
     // Log successful responses
@@ -51,37 +76,98 @@ api.interceptors.response.use(
     if (setCookieHeader) {
       console.log('🍪 Response set-cookie header:', setCookieHeader);
     }
-    
+
     return response;
   },
   async (error: AxiosError) => {
+    const originalRequest = error.config as typeof error.config & { _retry?: boolean };
     console.log('❌ API Error:', error.response?.status, error.response?.data);
-    
-    // Handle 401 unauthorized errors - but NOT for login and getCurrentUser endpoints
-    if (error.response?.status === 401) {
-      const isLoginEndpoint = error.config?.url?.includes('/login');
-      const isGetUserEndpoint = error.config?.url?.includes('/auth/customer/me');
-      const isRefreshEndpoint = error.config?.url?.includes('/refresh');
-      
-      // Don't redirect on login, getCurrentUser, or refresh endpoints
-      if (isLoginEndpoint || isGetUserEndpoint || isRefreshEndpoint) {
-        console.log('🚫 401 on auth endpoint - not redirecting');
+
+    // Handle 401 unauthorized errors with automatic token refresh
+    if (error.response?.status === 401 && originalRequest) {
+      const isLoginEndpoint = originalRequest.url?.includes('/login');
+      const isRefreshEndpoint = originalRequest.url?.includes('/refresh');
+      const isRegisterEndpoint = originalRequest.url?.includes('/register');
+      const isConfirmEndpoint = originalRequest.url?.includes('/confirm');
+
+      // Don't attempt refresh for auth endpoints or if already retried
+      if (isLoginEndpoint || isRefreshEndpoint || isRegisterEndpoint || isConfirmEndpoint || originalRequest._retry) {
+        console.log('🚫 401 on auth endpoint or already retried - not refreshing');
+
+        // Don't redirect if on booking pages (they handle auth themselves)
+        const isOnBookingPage = typeof window !== 'undefined' && window.location.pathname.includes('/book-road-test-vehicle');
+
+        // Only redirect if not on a public auth page or booking page
+        if (!isLoginEndpoint && !isRegisterEndpoint && !isConfirmEndpoint && !isOnBookingPage && typeof window !== 'undefined') {
+          console.log('🚨 Redirecting to login due to auth failure');
+          // Clear cookies
+          document.cookie = '_elanAuth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
+          document.cookie = '_elanAuthR=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
+          window.location.href = '/login';
+        }
+
         return Promise.reject(error);
       }
-      
-      console.log('🚨 401 Unauthorized - redirecting to login');
-      
-      // Clear any stored auth state and redirect
-      if (typeof window !== 'undefined') {
-        // Clear any auth cookies
-        document.cookie = '_elanAuth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
-        document.cookie = '_elanAuthR=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
-        
-        // Redirect to login
-        window.location.href = '/login';
+
+      // Don't attempt refresh if no refresh token exists
+      if (!hasRefreshToken()) {
+        console.log('🚫 No refresh token available - user is unauthenticated');
+        return Promise.reject(error);
+      }
+
+      // If we're already refreshing, queue this request
+      if (isRefreshing) {
+        console.log('⏳ Token refresh in progress, queueing request...');
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(() => {
+            return api(originalRequest);
+          })
+          .catch(err => {
+            return Promise.reject(err);
+          });
+      }
+
+      // Mark that we're refreshing
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      console.log('🔄 Attempting token refresh...');
+
+      try {
+        // Attempt to refresh the token
+        await api.post('/auth/customer/refresh');
+        console.log('✅ Token refresh successful');
+
+        // Process queued requests
+        processQueue();
+        isRefreshing = false;
+
+        // Retry the original request
+        return api(originalRequest);
+      } catch (refreshError) {
+        console.error('❌ Token refresh failed:', refreshError);
+
+        // Reject all queued requests
+        processQueue(refreshError);
+        isRefreshing = false;
+
+        // Don't redirect if on booking pages (they handle auth themselves)
+        const isOnBookingPage = typeof window !== 'undefined' && window.location.pathname.includes('/book-road-test-vehicle');
+
+        // Clear cookies and redirect to login (only if not on booking page)
+        if (typeof window !== 'undefined' && !isOnBookingPage) {
+          console.log('🚨 Redirecting to login after failed refresh');
+          document.cookie = '_elanAuth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
+          document.cookie = '_elanAuthR=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
+          window.location.href = '/login';
+        }
+
+        return Promise.reject(refreshError);
       }
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -188,17 +274,18 @@ export const authApi = {
   // Confirm email address after registration
   confirmEmail: async (hash: string): Promise<ApiResponse> => {
     try {
-      await api.post('/auth/customer/email/confirm', { hash });
-      return { 
+      // Endpoint returns 204 No Content on success
+      await api.post('/auth/email/confirm', { hash });
+      return {
         success: true,
         data: { message: 'Email verified successfully! You can now login to your account.' }
       };
     } catch (error) {
       const axiosError = error as AxiosError<ApiError>;
       const errorData = axiosError.response?.data;
-      
-      return { 
-        success: false, 
+
+      return {
+        success: false,
         error: errorData || {
           status_code: 500,
           message: 'Email verification failed. Please try again.'
@@ -207,20 +294,45 @@ export const authApi = {
     }
   },
 
+  // Resend confirmation email
+  resendConfirmationEmail: async (email: string): Promise<ApiResponse> => {
+    try {
+      console.log('📧 Resending confirmation email to:', email);
+      await api.post('/auth/email/confirm/new', { email });
+      return {
+        success: true,
+        data: { message: 'Confirmation email has been resent! Please check your inbox.' }
+      };
+    } catch (error) {
+      const axiosError = error as AxiosError<ApiError>;
+      const errorData = axiosError.response?.data;
+      console.error('❌ Resend confirmation email failed:', errorData);
+
+      return {
+        success: false,
+        error: errorData || {
+          status_code: 500,
+          message: 'Failed to resend confirmation email. Please try again.'
+        }
+      };
+    }
+  },
+
   // Initiate password reset process
   forgotPassword: async (email: string): Promise<ApiResponse> => {
     try {
-      await api.post('/auth/customer/forgot/password', { email });
-      return { 
+      // Endpoint: POST /v1/auth/forgot/password
+      await api.post('/auth/forgot/password', { email });
+      return {
         success: true,
         data: { message: 'If an account with this email exists, you will receive a password reset link shortly.' }
       };
     } catch (error) {
       const axiosError = error as AxiosError<ApiError>;
       const errorData = axiosError.response?.data;
-      
-      return { 
-        success: false, 
+
+      return {
+        success: false,
         error: errorData || {
           status_code: 500,
           message: 'Failed to send password reset email. Please try again.'
@@ -232,20 +344,21 @@ export const authApi = {
   // Reset password using hash from email
   resetPassword: async (hash: string, newPassword: string): Promise<ApiResponse> => {
     try {
-      await api.post('/auth/customer/reset/password', { 
+      // Endpoint: POST /v1/auth/reset/password
+      await api.post('/auth/reset/password', {
         hash,
-        password: newPassword 
+        password: newPassword
       });
-      return { 
+      return {
         success: true,
         data: { message: 'Password has been reset successfully! You can now login with your new password.' }
       };
     } catch (error) {
       const axiosError = error as AxiosError<ApiError>;
       const errorData = axiosError.response?.data;
-      
-      return { 
-        success: false, 
+
+      return {
+        success: false,
         error: errorData || {
           status_code: 500,
           message: 'Password reset failed. Please try again.'
@@ -297,6 +410,26 @@ export const authApi = {
       const axiosError = error as AxiosError<ApiError>;
       console.error('❌ Profile update failed:', axiosError.response?.data);
       return { success: false, error: axiosError.response?.data };
+    }
+  },
+
+  // Refresh authentication token
+  refreshToken: async (): Promise<ApiResponse<UserProfile>> => {
+    try {
+      console.log('🔄 Refreshing authentication token...');
+      const response = await api.post('/auth/customer/refresh');
+      console.log('✅ Token refresh successful');
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      const axiosError = error as AxiosError<ApiError>;
+      console.error('❌ Token refresh failed:', axiosError.response?.data);
+      return {
+        success: false,
+        error: axiosError.response?.data
+      };
     }
   },
 

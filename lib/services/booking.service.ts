@@ -22,6 +22,11 @@ import type {
 
 class BookingApiService {
   private apiClient: AxiosInstance;
+  private isRefreshing = false;
+  private failedQueue: Array<{
+    resolve: (value?: unknown) => void;
+    reject: (reason?: unknown) => void;
+  }> = [];
 
   constructor() {
     this.apiClient = axios.create({
@@ -33,6 +38,24 @@ class BookingApiService {
     });
 
     this.setupInterceptors();
+  }
+
+  private processQueue(error: unknown = null): void {
+    this.failedQueue.forEach(prom => {
+      if (error) {
+        prom.reject(error);
+      } else {
+        prom.resolve();
+      }
+    });
+
+    this.failedQueue = [];
+  }
+
+  // Helper to check if refresh token cookie exists
+  private hasRefreshToken(): boolean {
+    if (typeof document === 'undefined') return false;
+    return document.cookie.includes('_elanAuthR=');
   }
 
   // ============================================================================
@@ -53,22 +76,77 @@ class BookingApiService {
       }
     );
 
-    // Response interceptor
+    // Response interceptor with automatic token refresh
     this.apiClient.interceptors.response.use(
       (response) => {
         console.log('✅ Booking API Response:', response.status, response.config.url);
         return response;
       },
       async (error: AxiosError) => {
+        const originalRequest = error.config as typeof error.config & { _retry?: boolean };
         console.error('❌ Booking API Error:', error.response?.status, error.response?.data);
 
-        // REMOVED: Auto-redirect to /login on 401 errors
-        // This was causing issues with the booking flow where users
-        // were being redirected before they had a chance to authenticate
-        // in Step 2 (Booking Details)
+        // Handle 401 errors with automatic token refresh
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+          const isRefreshEndpoint = originalRequest.url?.includes('/refresh');
+          const isRegisterEndpoint = originalRequest.url?.includes('/register');
+          const isLoginEndpoint = originalRequest.url?.includes('/login');
+          const isConfirmEndpoint = originalRequest.url?.includes('/confirm');
 
-        // Let individual pages handle authentication requirements
-        // instead of forcing a global redirect
+          // Don't attempt refresh for auth endpoints
+          if (isRefreshEndpoint || isRegisterEndpoint || isLoginEndpoint || isConfirmEndpoint) {
+            return Promise.reject(error);
+          }
+
+          // Don't attempt refresh if no refresh token exists (user is unauthenticated)
+          if (!this.hasRefreshToken()) {
+            console.log('🚫 No refresh token available (booking service) - user is unauthenticated');
+            return Promise.reject(error);
+          }
+
+          // If we're already refreshing, queue this request
+          if (this.isRefreshing) {
+            console.log('⏳ Token refresh in progress (booking service), queueing request...');
+            return new Promise((resolve, reject) => {
+              this.failedQueue.push({ resolve, reject });
+            })
+              .then(() => {
+                return this.apiClient(originalRequest);
+              })
+              .catch(err => {
+                return Promise.reject(err);
+              });
+          }
+
+          // Mark that we're refreshing
+          originalRequest._retry = true;
+          this.isRefreshing = true;
+
+          console.log('🔄 Attempting token refresh (booking service)...');
+
+          try {
+            // Attempt to refresh the token
+            await this.apiClient.post('/auth/customer/refresh');
+            console.log('✅ Token refresh successful (booking service)');
+
+            // Process queued requests
+            this.processQueue();
+            this.isRefreshing = false;
+
+            // Retry the original request
+            return this.apiClient(originalRequest);
+          } catch (refreshError) {
+            console.log('❌ Token refresh failed (booking service) - user likely unauthenticated');
+
+            // Process queued requests with error
+            this.processQueue(refreshError);
+            this.isRefreshing = false;
+
+            // Don't redirect for booking endpoints - let the page handle it
+            // This allows unauthenticated users to browse the booking flow
+            return Promise.reject(error);
+          }
+        }
 
         return Promise.reject(error);
       }

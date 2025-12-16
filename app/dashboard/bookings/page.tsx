@@ -1,9 +1,9 @@
 // app/dashboard/bookings/page.tsx
 "use client"
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Check, Phone, Loader2, Clock, AlertCircle, Calendar, MapPin, X, DollarSign } from "lucide-react";
+import { Check, Phone, Loader2, Clock, AlertCircle, Calendar, MapPin, X, DollarSign, RefreshCw } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { bookingApi } from "@/lib/api";
 import { useRefundRequest } from "@/lib/hooks/useBooking";
 import type { ApiResponse } from "@/lib/types/auth.types";
+import type { RefundRequest } from "@/lib/types/booking.types";
 
 type TabType = "Active" | "Completed";
 
@@ -268,7 +269,8 @@ const BookingCard: React.FC<{
   instructor: Instructor | null;
   isSearchingInstructor: boolean;
   onRefundSuccess: () => void;
-}> = ({ booking, instructor, isSearchingInstructor, onRefundSuccess }) => {
+  refundRequest?: RefundRequest | null;
+}> = ({ booking, instructor, isSearchingInstructor, onRefundSuccess, refundRequest }) => {
   const [showRefundModal, setShowRefundModal] = useState(false);
   
   const formatPrice = (priceInCents: number): string => {
@@ -326,6 +328,30 @@ const BookingCard: React.FC<{
     if (result === 'PASS') return 'text-green-600 bg-green-50';
     if (result === 'FAIL') return 'text-red-600 bg-red-50';
     return 'text-gray-600 bg-gray-50';
+  };
+
+  const getRefundStatusColor = (status?: string): string => {
+    if (!status) return 'text-yellow-600 bg-yellow-50 border-yellow-200'; // Default to pending style
+
+    switch (status.toLowerCase()) {
+      case 'pending': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'processed': return 'text-green-600 bg-green-50 border-green-200';
+      case 'rejected': return 'text-red-600 bg-red-50 border-red-200';
+      case 'cancelled': return 'text-gray-600 bg-gray-50 border-gray-200';
+      default: return 'text-blue-600 bg-blue-50 border-blue-200';
+    }
+  };
+
+  const getRefundStatusIcon = (status?: string) => {
+    if (!status) return Clock; // Default to pending icon
+
+    switch (status.toLowerCase()) {
+      case 'pending': return Clock;
+      case 'processed': return Check;
+      case 'rejected': return X;
+      case 'cancelled': return X;
+      default: return RefreshCw;
+    }
   };
 
   const getTestTypeDisplay = (): string => {
@@ -577,6 +603,91 @@ const BookingCard: React.FC<{
         </div>
       </div>
 
+      {/* Refund Request Status - Show if refund request exists */}
+      {refundRequest && (
+        <div className={cn(
+          "border rounded-lg p-4",
+          getRefundStatusColor(refundRequest.status)
+        )}>
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center gap-2">
+              {React.createElement(getRefundStatusIcon(refundRequest.status), {
+                className: "h-5 w-5"
+              })}
+              <h4 className="font-semibold">Refund Request</h4>
+            </div>
+            <span className="px-2 py-1 text-xs font-medium rounded-full bg-white">
+              {refundRequest.status
+                ? refundRequest.status.charAt(0).toUpperCase() + refundRequest.status.slice(1)
+                : 'Pending'
+              }
+            </span>
+          </div>
+
+          <div className="space-y-2 text-sm">
+            {refundRequest.id && (
+              <div className="flex justify-between">
+                <span className="font-medium">Request ID:</span>
+                <span>#{refundRequest.id}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="font-medium">Refund Amount:</span>
+              <span className="font-semibold">{formatPrice(refundRequest.amount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-medium">Refund Percentage:</span>
+              <span>{refundRequest.refund_percentage}%</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-medium">Requested On:</span>
+              <span>
+                {new Date(refundRequest.request_date).toLocaleDateString('en-CA', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </span>
+            </div>
+            {refundRequest.processed_at && (
+              <div className="flex justify-between">
+                <span className="font-medium">Processed On:</span>
+                <span>
+                  {new Date(refundRequest.processed_at).toLocaleDateString('en-CA', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </span>
+              </div>
+            )}
+            {refundRequest.refund_reason && (
+              <div className="pt-2 border-t">
+                <span className="font-medium">Reason:</span>
+                <p className="mt-1 text-xs opacity-90">{refundRequest.refund_reason}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Status-specific messages */}
+          {(!refundRequest.status || refundRequest.status === 'pending') && (
+            <div className="mt-3 p-2 bg-white bg-opacity-50 rounded text-xs">
+              <p>Your refund request is being reviewed. We typically process requests within 3-5 business days.</p>
+            </div>
+          )}
+          {refundRequest.status === 'processed' && (
+            <div className="mt-3 p-2 bg-white bg-opacity-50 rounded text-xs">
+              <p>Your refund has been processed. Please allow 5-10 business days for the amount to appear in your account.</p>
+            </div>
+          )}
+          {refundRequest.status === 'rejected' && (
+            <div className="mt-3 p-2 bg-white bg-opacity-50 rounded text-xs">
+              <p>Your refund request was not approved. Please contact support for more information.</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Instructor information */}
       <div className="bg-gray-50 p-4 rounded-lg flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -666,8 +777,8 @@ const BookingCard: React.FC<{
         </div>
       )}
 
-      {/* Refund Request Button - Show for eligible bookings (except pending with checkout URL) */}
-      {['confirmed', 'succeeded'].includes(booking.status) && (
+      {/* Refund Request Button - Show for eligible bookings (except pending with checkout URL or if refund already exists) */}
+      {['confirmed', 'succeeded'].includes(booking.status) && !refundRequest && (
         <div className="mt-3">
           <Button
             onClick={() => setShowRefundModal(true)}
@@ -694,14 +805,16 @@ const BookingCard: React.FC<{
               </div>
             </div>
           </div>
-          <Button
-            onClick={() => setShowRefundModal(true)}
-            variant="outline"
-            className="w-full flex items-center justify-center gap-2 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
-          >
-            <DollarSign className="h-4 w-4" />
-            Request Refund
-          </Button>
+          {!refundRequest && (
+            <Button
+              onClick={() => setShowRefundModal(true)}
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+            >
+              <DollarSign className="h-4 w-4" />
+              Request Refund
+            </Button>
+          )}
         </div>
       )}
 
@@ -720,6 +833,7 @@ const BookingCard: React.FC<{
 export default function Bookings() {
   const [activeTab, setActiveTab] = useState<TabType>("Active");
   const [bookings, setBookings] = useState<APIBooking[]>([]);
+  const [refundRequests, setRefundRequests] = useState<Record<number, RefundRequest>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user, isLoading: authLoading, isAuthenticated, checkAuthStatus } = useAuth();
@@ -744,8 +858,32 @@ export default function Bookings() {
     }
   };
 
+  // Fetch refund requests for all bookings
+  const fetchRefundRequests = useCallback(async () => {
+    try {
+      const response = await bookingApi.getRefundRequests();
+
+      if (response.success && response.data) {
+        // The API returns { data: [...], meta: {...} }
+        const refunds = (response.data as unknown as { data: RefundRequest[] }).data || [];
+
+        // Map refund requests by booking_id for easy lookup
+        const refundMap: Record<number, RefundRequest> = {};
+        refunds.forEach(refund => {
+          refundMap[refund.booking_id] = refund;
+        });
+
+        setRefundRequests(refundMap);
+      } else {
+        console.error('Failed to fetch refund requests:', response.error);
+      }
+    } catch (err) {
+      console.error('Error fetching refund requests:', err);
+    }
+  }, []);
+
   // Fetch bookings from API
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -765,6 +903,9 @@ export default function Bookings() {
         }
 
         setBookings(response.data);
+
+        // Fetch refund requests after bookings are loaded
+        await fetchRefundRequests();
       } else {
         setError(response.error?.message || 'Failed to fetch bookings');
       }
@@ -774,7 +915,7 @@ export default function Bookings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchRefundRequests]);
 
   // Auth check effect
   useEffect(() => {
@@ -798,7 +939,7 @@ export default function Bookings() {
     if (isAuthenticated && user) {
       fetchBookings();
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, fetchBookings]);
 
   // Filter bookings based on active tab
   const getFilteredBookings = (): APIBooking[] => {
@@ -932,6 +1073,7 @@ export default function Bookings() {
               filteredBookings.map((booking) => {
                 const instructor = booking.instructor_id ? mockInstructors[booking.instructor_id] : null;
                 const isSearchingInstructor = !booking.instructor_id && ['pending', 'confirmed', 'succeeded'].includes(booking.status);
+                const refundRequest = refundRequests[booking.id] || null;
 
                 return (
                   <BookingCard
@@ -940,6 +1082,7 @@ export default function Bookings() {
                     instructor={instructor}
                     isSearchingInstructor={isSearchingInstructor}
                     onRefundSuccess={fetchBookings}
+                    refundRequest={refundRequest}
                   />
                 );
               })

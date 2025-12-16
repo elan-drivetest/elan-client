@@ -21,7 +21,7 @@ import type {
 // DRIVE TEST CENTERS HOOK
 // ============================================================================
 
-export const useDriveTestCenters = () => {
+export const useDriveTestCenters = (enabled: boolean = true) => {
   const [centers, setCenters] = useState<DriveTestCenter[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +32,18 @@ export const useDriveTestCenters = () => {
 
     try {
       const response = await bookingApi.getDriveTestCenters();
-      
+
       if (response.success && response.data) {
         setCenters(response.data);
       } else {
-        setError(response.error?.message || 'Failed to fetch test centers');
+        // Silently handle 401 errors (unauthenticated users)
+        // Test centers will be loaded later when user authenticates
+        if (response.error?.status_code === 401) {
+          console.log('🏢 Test centers require authentication - will load after login');
+          setCenters([]); // Set empty array instead of error
+        } else {
+          setError(response.error?.message || 'Failed to fetch test centers');
+        }
       }
     } catch (err) {
       setError('Network error occurred while fetching test centers');
@@ -46,8 +53,11 @@ export const useDriveTestCenters = () => {
   }, []);
 
   useEffect(() => {
-    fetchCenters();
-  }, [fetchCenters]);
+    // Only fetch if enabled
+    if (enabled) {
+      fetchCenters();
+    }
+  }, [fetchCenters, enabled]);
 
   const getCenterById = useCallback((id: number): DriveTestCenter | undefined => {
     return centers.find(center => center.id === id);
@@ -71,7 +81,7 @@ export const useDriveTestCenters = () => {
 // ADDONS HOOK
 // ============================================================================
 
-export const useAddons = (testType?: TestType) => {
+export const useAddons = (testType?: TestType, enabled: boolean = true) => {
   const [addons, setAddons] = useState<Addon[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,18 +92,25 @@ export const useAddons = (testType?: TestType) => {
 
     try {
       const response = await bookingApi.getAddons();
-      
+
       if (response.success && response.data) {
         let filteredAddons = response.data;
-        
+
         // Filter by test type if provided
         if (testType) {
           filteredAddons = bookingUtils.getAddonsForTestType(response.data, testType);
         }
-        
+
         setAddons(filteredAddons);
       } else {
-        setError(response.error?.message || 'Failed to fetch addons');
+        // Silently handle 401 errors (unauthenticated users)
+        // Add-ons will be loaded later when user authenticates
+        if (response.error?.status_code === 401) {
+          console.log('📋 Add-ons require authentication - will load after login');
+          setAddons([]); // Set empty array instead of error
+        } else {
+          setError(response.error?.message || 'Failed to fetch addons');
+        }
       }
     } catch (err) {
       setError('Network error occurred while fetching addons');
@@ -103,8 +120,11 @@ export const useAddons = (testType?: TestType) => {
   }, [testType]);
 
   useEffect(() => {
-    fetchAddons();
-  }, [fetchAddons]);
+    // Only fetch if enabled
+    if (enabled) {
+      fetchAddons();
+    }
+  }, [fetchAddons, enabled]);
 
   const getAddonById = useCallback((id: number): Addon | undefined => {
     return addons.find(addon => addon.id === id);

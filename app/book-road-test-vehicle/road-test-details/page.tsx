@@ -120,33 +120,51 @@ export default function RoadTestDetails() {
   // Validation function
   const validateForm = (): string[] => {
     const errors: string[] = [];
-    
+
     if (!bookingState.testType) {
       errors.push('Please select a test type (G2 or G)');
     }
-    
+
     if (!selectedCenter) {
       errors.push('Please select a test center');
     }
-    
+
     if (!bookingState.testDate) {
       errors.push('Please select a test date');
     }
-    
+
     if (!bookingState.testTime) {
       errors.push('Please select a test time');
     }
 
-    // Validate date is not in the past
+    // Validate date is not in the past and is at least 2 days (48 hours) from now
     if (bookingState.testDate && bookingState.testTime) {
       const selectedDateTime = new Date(`${bookingState.testDate}T${bookingState.testTime}`);
       const now = new Date();
-      
+
+      // Check if date is in the past
       if (selectedDateTime <= now) {
         errors.push('Please select a future date and time');
+      } else {
+        // Check if date is at least 2 days (48 hours) from now
+        // This means if today is Dec 16, earliest available date is Dec 19
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset to start of today
+
+        const minDateFromNow = new Date(today);
+        minDateFromNow.setDate(minDateFromNow.getDate() + 3);
+
+        // Parse the selected date properly in local timezone (not UTC)
+        const [year, month, day] = bookingState.testDate.split('-').map(Number);
+        const selectedDateOnly = new Date(year, month - 1, day); // month is 0-indexed
+        selectedDateOnly.setHours(0, 0, 0, 0);
+
+        if (selectedDateOnly < minDateFromNow) {
+          errors.push('Test date must be at least 2 days (48 hours) in advance. Please select a date that is at least 3 calendar days from today.');
+        }
       }
     }
-    
+
     return errors;
   };
 
@@ -264,6 +282,7 @@ export default function RoadTestDetails() {
               date={selectedDate}
               setDate={handleDateTimeChange}
               disabled={!selectedCenter}
+              minDaysFromToday={3}
             />
             {!selectedCenter && (
               <p className="text-sm text-gray-500 mt-1">

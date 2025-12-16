@@ -3,14 +3,12 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormInput } from "@/components/ui/form-input";
 import { Separator } from "@/components/ui/separator";
 import { authApi, handleApiError, validateRegistrationData } from "@/lib/api";
 import type { RegisterRequest } from "@/lib/types/auth.types";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [formData, setFormData] = useState<RegisterRequest>({
     email: "",
     phone: "",
@@ -106,8 +104,8 @@ export default function SignupPage() {
     setIsResendingEmail(true);
     setResendMessage("");
     try {
-      const result = await authApi.confirmEmail(formData.email);
-      
+      const result = await authApi.resendConfirmationEmail(formData.email);
+
       if (result.success) {
         setResendMessage("Verification email sent! Please check your inbox.");
       } else {
@@ -171,10 +169,6 @@ export default function SignupPage() {
       if (result.success) {
         // Registration successful - show success message
         setShowSuccess(true);
-        // Optional: redirect to login page after a delay
-        setTimeout(() => {
-          router.push("/login");
-        }, 3000);
       } else {
         // Handle API errors
         const errorMessage = handleApiError(result.error);
@@ -210,11 +204,8 @@ export default function SignupPage() {
               Registration Successful!
             </h2>
             <p className="text-green-700 mb-6">
-              {"Thank you for signing up! We've sent a verification email to"} <strong>{formData.email}</strong>. 
+              {"Thank you for signing up! We've sent a verification email to"} <strong>{formData.email}</strong>.
               Please check your inbox and click the verification link to activate your account.
-            </p>
-            <p className="text-sm text-green-600">
-              Redirecting to login page in a few seconds...
             </p>
           </div>
           

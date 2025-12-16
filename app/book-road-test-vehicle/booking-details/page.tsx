@@ -23,7 +23,7 @@ const bookingSteps = [
 
 export default function BookingDetails() {
   const router = useRouter();
-  const { bookingState, updateBookingState, setCurrentStep } = useBooking();
+  const { bookingState, updateBookingState, setCurrentStep, refetchBookingData } = useBooking();
   const { isAuthenticated, user, login, checkAuthStatus } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -31,6 +31,8 @@ export default function BookingDetails() {
   const [showSuccessState, setShowSuccessState] = useState(false);
   const [showEmailVerificationNotice, setShowEmailVerificationNotice] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
+  const [resendEmailSuccess, setResendEmailSuccess] = useState(false);
   
   // Use refs to prevent infinite re-renders
   const hasSetCurrentStep = useRef(false);
@@ -158,10 +160,16 @@ export default function BookingDetails() {
       
       if (result.success && result.data) {
         console.log('✅ Login successful');
-        
+
         // Set user in auth context
         login(result.data);
-        
+
+        // Call /me endpoint to ensure user data is fully loaded
+        await checkAuthStatus();
+
+        // Refetch booking data now that user is authenticated
+        refetchBookingData();
+
         // Store user data in booking state
         updateBookingState({
           userDetails: {
@@ -170,7 +178,7 @@ export default function BookingDetails() {
             phone: result.data.phone_number || "",
           }
         });
-        
+
         // Show success state instead of auto-redirecting
         setShowSuccessState(true);
       } else {
@@ -191,6 +199,30 @@ export default function BookingDetails() {
     router.push("/book-road-test-vehicle/test-details");
   };
 
+  const handleResendEmail = async () => {
+    if (!registeredEmail) return;
+
+    setIsResendingEmail(true);
+    setResendEmailSuccess(false);
+
+    try {
+      const result = await authApi.resendConfirmationEmail(registeredEmail);
+
+      if (result.success) {
+        setResendEmailSuccess(true);
+        // Reset success message after 5 seconds
+        setTimeout(() => setResendEmailSuccess(false), 5000);
+      } else {
+        setErrors({ general: handleApiError(result.error) });
+      }
+    } catch (error) {
+      console.error('❌ Resend email error:', error);
+      setErrors({ general: "Failed to resend email. Please try again." });
+    } finally {
+      setIsResendingEmail(false);
+    }
+  };
+
   const toggleAuthMode = () => {
     setShowLogin(!showLogin);
     setErrors({ general: "" }); // Clear errors when switching
@@ -199,12 +231,17 @@ export default function BookingDetails() {
 
   // Show success state with user info and next button (only if authenticated)
   if (showSuccessState && isAuthenticated) {
-    const userDetails = bookingState.userDetails;
-    
+    // Use bookingState.userDetails if available, otherwise fallback to user from AuthContext
+    const userDetails = bookingState.userDetails || {
+      fullName: user?.full_name || '',
+      email: user?.email || '',
+      phone: user?.phone_number || ''
+    };
+
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
         <BookingStepsProgress steps={bookingSteps} />
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="col-span-1 md:col-span-1">
             <h1 className="text-2xl font-bold mb-1">Booking details</h1>
@@ -219,10 +256,10 @@ export default function BookingDetails() {
                     {isAuthenticated ? "Welcome back!" : "Account created successfully!"}
                   </h3>
                   <div className="space-y-1 text-sm text-green-800">
-                    <p><strong>Name:</strong> {userDetails?.fullName}</p>
-                    <p><strong>Email:</strong> {userDetails?.email}</p>
-                    {userDetails?.phone && (
-                      <p><strong>Phone:</strong> {userDetails.phone}</p>
+                    <p><strong>Name:</strong> {userDetails?.fullName || user?.full_name || 'N/A'}</p>
+                    <p><strong>Email:</strong> {userDetails?.email || user?.email || 'N/A'}</p>
+                    {(userDetails?.phone || user?.phone_number) && (
+                      <p><strong>Phone:</strong> {userDetails?.phone || user?.phone_number}</p>
                     )}
                   </div>
                 </div>
@@ -293,16 +330,36 @@ export default function BookingDetails() {
                     We&apos;ve sent a verification link to <strong>{registeredEmail}</strong>.
                     Please check your inbox and click the link to verify your email and continue with your booking.
                   </p>
-                  <p className="text-xs text-blue-700">
-                    Didn&apos;t receive the email? Check your spam folder or{" "}
+
+                  {/* Success message after resending */}
+                  {resendEmailSuccess && (
+                    <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded">
+                      <p className="text-xs text-green-800 font-medium">
+                        ✓ Confirmation email has been resent! Please check your inbox.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-xs text-blue-700">
+                      Didn&apos;t receive the email?
+                    </p>
+                    <button
+                      onClick={handleResendEmail}
+                      disabled={isResendingEmail}
+                      className="text-xs text-blue-700 underline hover:no-underline font-medium bg-transparent border-none p-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isResendingEmail ? "Sending..." : "Resend Email"}
+                    </button>
+                    <span className="text-xs text-blue-700">or</span>
                     <button
                       onClick={toggleAuthMode}
-                      className="underline hover:no-underline font-medium bg-transparent border-none p-0 cursor-pointer"
+                      className="text-xs text-blue-700 underline hover:no-underline font-medium bg-transparent border-none p-0 cursor-pointer"
                     >
                       try logging in
                     </button>
-                    {" "}if you already verified.
-                  </p>
+                    <span className="text-xs text-blue-700">if you already verified.</span>
+                  </div>
                 </div>
               </div>
             </div>

@@ -12,6 +12,7 @@ interface AuthContextType {
   login: (user: UserProfile) => void;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
+  refreshAuth: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,11 +59,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   };
 
+  // Manually refresh authentication token
+  const refreshAuth = async (): Promise<boolean> => {
+    console.log('🔄 Manually refreshing authentication...');
+    setIsLoading(true);
+
+    try {
+      const result = await authApi.refreshToken();
+
+      if (result.success && result.data) {
+        console.log('✅ Auth refresh successful, updating user data');
+        setUser(result.data);
+        return true;
+      } else {
+        console.log('❌ Auth refresh failed');
+        setUser(null);
+        return false;
+      }
+    } catch (error) {
+      console.error('💥 Auth refresh error:', error);
+      setUser(null);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Logout function
   const logout = async (): Promise<void> => {
     console.log('🚪 Starting logout process...');
     setIsLoading(true);
-    
+
     try {
       // Call backend logout API
       await authApi.logout();
@@ -74,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🧹 Clearing user data and redirecting...');
       setUser(null);
       setIsLoading(false);
-      
+
       // Redirect to home page
       if (typeof window !== 'undefined') {
         window.location.href = '/';
@@ -92,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     checkAuthStatus,
+    refreshAuth,
   };
 
   return (

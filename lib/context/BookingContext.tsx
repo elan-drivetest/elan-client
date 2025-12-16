@@ -81,17 +81,20 @@ interface BookingContextType {
   currentStep: number;
   setCurrentStep: (step: number) => void;
   calculatePricing: () => void;
-  
+
   // API integration methods
   createBooking: () => Promise<{ success: boolean; data?: any; error?: string }>;
   validateBookingData: () => { isValid: boolean; errors: string[] };
   transformToApiFormat: () => CreateBookingRequest | null;
-  
+
   // Real-time data from APIs
   testCenters: DriveTestCenter[];
   addons: Addon[];
   isLoadingCenters: boolean;
   isLoadingAddons: boolean;
+
+  // Refetch method - call after authentication
+  refetchBookingData: () => void;
 }
 
 // Create the initial state
@@ -133,10 +136,19 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const isInitialized = useRef(false);
 
-  // API hooks for real-time data (FIXED: Use correct hook name)
-  const { centers: testCenters, loading: isLoadingCenters } = useDriveTestCenters();
-  const { addons, loading: isLoadingAddons } = useAddons();
+  // API hooks for real-time data
+  // Test centers: Enabled on Step 1 (needed for dropdown)
+  // Addons: Disabled initially, only fetch on Step 3 or after auth
+  const { centers: testCenters, loading: isLoadingCenters, refetch: refetchCenters } = useDriveTestCenters(true);
+  const { addons, loading: isLoadingAddons, refetch: refetchAddons } = useAddons(undefined, false);
   const { createBooking: apiCreateBooking } = useBookingCreation();
+
+  // Method to refetch all booking data (call after authentication or on Step 3)
+  const refetchBookingData = useCallback(() => {
+    console.log('🔄 Refetching booking data after authentication...');
+    refetchCenters();
+    refetchAddons();
+  }, [refetchCenters, refetchAddons]);
 
   // Load state from localStorage on client-side
   useEffect(() => {
@@ -414,7 +426,8 @@ const formattedDateTime = (() => {
     testCenters,
     addons,
     isLoadingCenters,
-    isLoadingAddons
+    isLoadingAddons,
+    refetchBookingData
   };
 
   return (

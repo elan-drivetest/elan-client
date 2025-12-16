@@ -409,46 +409,26 @@ export default function TestDetails() {
           <div className="mb-8">
             <DocumentUpload
               title="Upload Your G2/G Road Test Booking Confirmation"
-              description={
-                isUploadingRoadTest 
-                  ? "Uploading..." 
-                  : roadTestUploadError 
-                    ? `Error: ${roadTestUploadError}` 
-                    : roadTestUploadSuccess || roadTestDocUrl
-                      ? `✅ Uploaded: ${bookingState.documents?.roadTestFileMetadata?.originalName || "Document uploaded"}` 
-                      : "PNG, JPG, PDF or TXT file"
-              }
-              actionText={
-                isUploadingRoadTest 
-                  ? "Uploading..." 
-                  : roadTestDocUrl 
-                    ? "Change Document" 
-                    : "Upload Your Road Test Documents"
-              }
+              description="PNG, JPG, PDF or TXT file"
+              actionText={roadTestDocUrl ? "Change Document" : "Upload Your Road Test Documents"}
               icon={<FileText className="h-4 w-4 text-gray-600" />}
               onFileSelect={handleRoadTestFileSelect}
+              error={roadTestUploadError}
+              success={roadTestUploadSuccess}
+              isUploading={isUploadingRoadTest}
+              maxSizeMB={5}
             />
-            
+
             <DocumentUpload
               title="Upload Your Ontario License"
-              description={
-                isUploadingLicense 
-                  ? "Uploading..." 
-                  : licenseUploadError 
-                    ? `Error: ${licenseUploadError}` 
-                    : licenseUploadSuccess || licenseDocUrl
-                      ? `✅ Uploaded: ${bookingState.documents?.licenseFileMetadata?.originalName || "Document uploaded"}` 
-                      : "PNG, JPG, PDF or TXT file"
-              }
-              actionText={
-                isUploadingLicense 
-                  ? "Uploading..." 
-                  : licenseDocUrl 
-                    ? "Change Document" 
-                    : "Upload Your License"
-              }
+              description="PNG, JPG, PDF or TXT file"
+              actionText={licenseDocUrl ? "Change Document" : "Upload Your License"}
               icon={<CreditCard className="h-4 w-4 text-gray-600" />}
               onFileSelect={handleLicenseFileSelect}
+              error={licenseUploadError}
+              success={licenseUploadSuccess}
+              isUploading={isUploadingLicense}
+              maxSizeMB={5}
             />
           </div>
           
