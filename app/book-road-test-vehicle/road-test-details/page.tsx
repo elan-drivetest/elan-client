@@ -22,18 +22,25 @@ const bookingSteps = [
 
 export default function RoadTestDetails() {
   const router = useRouter();
-  const { 
-    bookingState, 
-    updateBookingState, 
-    setCurrentStep, 
-    testCenters, 
+  const {
+    bookingState,
+    updateBookingState,
+    setCurrentStep,
+    testCenters,
     isLoadingCenters,
-    calculatePricing 
+    calculatePricing
   } = useBooking();
+
+  // Calculate minimum allowed datetime (48 hours from now)
+  const minDateTime = React.useMemo(() => {
+    const now = new Date();
+    const min = new Date(now.getTime() + (48 * 60 * 60 * 1000)); // 48 hours in milliseconds
+    return min;
+  }, []);
 
   // Local state for form management
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    bookingState.testDate && bookingState.testTime 
+    bookingState.testDate && bookingState.testTime
       ? (() => {
           try {
             // Parse existing date/time from booking state
@@ -44,7 +51,7 @@ export default function RoadTestDetails() {
         })()
       : undefined
   );
-  
+
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   // Set current step on mount
@@ -289,6 +296,12 @@ export default function RoadTestDetails() {
                 Please select a test center first
               </p>
             )}
+            {selectedCenter && (
+              <p className="text-xs text-amber-600 mt-1.5 flex items-start gap-1">
+                <span className="text-amber-500 mt-0.5">⚠️</span>
+                <span>Must be at least 48 hours from now. Earlier dates are grayed out.</span>
+              </p>
+            )}
           </div>
           
           <div>
@@ -299,10 +312,17 @@ export default function RoadTestDetails() {
               date={selectedDate}
               setDate={handleDateTimeChange}
               disabled={!selectedCenter || !bookingState.testDate}
+              minDateTime={minDateTime}
             />
             {(!selectedCenter || !bookingState.testDate) && (
               <p className="text-sm text-gray-500 mt-1">
                 Please select a test center and date first
+              </p>
+            )}
+            {selectedCenter && bookingState.testDate && (
+              <p className="text-xs text-amber-600 mt-1.5 flex items-start gap-1">
+                <span className="text-amber-500 mt-0.5">⚠️</span>
+                <span>Time must be at least 48 hours from now. Earlier times are disabled.</span>
               </p>
             )}
           </div>

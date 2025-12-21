@@ -12,7 +12,7 @@ import { useBooking } from "@/lib/context/BookingContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { authApi, handleApiError } from "@/lib/api";
 import type { RegisterRequest, LoginRequest } from "@/lib/types/auth.types";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, LayoutDashboard } from "lucide-react";
 
 const bookingSteps = [
   { id: 1, name: "Road Test Details", path: "/book-road-test-vehicle/road-test-details" },
@@ -268,13 +268,23 @@ export default function BookingDetails() {
 
             <PickupOptions />
 
-            {/* Next Button */}
-            <div className="mt-6">
+            {/* Action Buttons */}
+            <div className="mt-6 space-y-3">
+              {/* Continue to Test Details Button */}
               <button
                 onClick={handleProceedToNext}
                 className="w-full bg-[#0C8B44] hover:bg-[#0C8B44]/90 text-white py-3 px-4 rounded-lg font-medium transition-colors"
               >
                 Continue to Test Details
+              </button>
+
+              {/* Go to Dashboard Button */}
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="w-full bg-white hover:bg-gray-50 text-gray-700 py-3 px-4 rounded-lg font-medium transition-colors border border-gray-300 flex items-center justify-center gap-2"
+              >
+                <LayoutDashboard size={18} />
+                Go to Dashboard
               </button>
             </div>
           </div>

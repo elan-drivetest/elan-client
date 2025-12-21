@@ -118,14 +118,6 @@ export function DatePicker({
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0">
         <div className="p-3">
-          {/* Info text about date restrictions */}
-          <div className="text-xs text-gray-600 mb-3 px-1">
-            <p>• Minimum {minDaysFromToday} days from today</p>
-            {unavailableDates.length > 0 && (
-              <p>• <span className="text-red-500">Red dates</span> are unavailable</p>
-            )}
-          </div>
-          
           <Calendar
             mode="single"
             selected={date}

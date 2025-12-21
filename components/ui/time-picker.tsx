@@ -13,6 +13,7 @@ interface TimePickerProps {
   className?: string;
   disabled?: boolean;
   minuteStep?: number; // Step for minutes (default: 15)
+  minDateTime?: Date; // Minimum allowed date/time (for 48-hour validation)
 }
 
 interface WheelPickerProps {
@@ -21,10 +22,11 @@ interface WheelPickerProps {
   onValueChange: (value: string) => void;
   disabled?: boolean;
   unit?: string;
+  disabledValues?: string[]; // Array of disabled values (for 48-hour validation)
 }
 
 // iOS-style wheel picker component
-function WheelPicker({ values, selectedValue, onValueChange, disabled = false, unit }: WheelPickerProps) {
+function WheelPicker({ values, selectedValue, onValueChange, disabled = false, unit, disabledValues = [] }: WheelPickerProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
   const [startY, setStartY] = React.useState(0);
@@ -46,15 +48,20 @@ function WheelPicker({ values, selectedValue, onValueChange, disabled = false, u
   // Handle scroll to snap to nearest item
   const handleScroll = React.useCallback(() => {
     if (!containerRef.current || disabled) return;
-    
+
     const scrollTop = containerRef.current.scrollTop;
     const selectedIndex = Math.round(scrollTop / itemHeight);
     const clampedIndex = Math.max(0, Math.min(selectedIndex, values.length - 1));
-    
+
+    // Skip disabled values
+    if (disabledValues.includes(values[clampedIndex])) {
+      return;
+    }
+
     if (values[clampedIndex] !== selectedValue) {
       onValueChange(values[clampedIndex]);
     }
-  }, [values, selectedValue, onValueChange, itemHeight, disabled]);
+  }, [values, selectedValue, onValueChange, itemHeight, disabled, disabledValues]);
 
   // Smooth scroll to position
   const scrollToIndex = (index: number) => {
@@ -128,26 +135,29 @@ function WheelPicker({ values, selectedValue, onValueChange, disabled = false, u
         {/* Actual values */}
         {values.map((value, index) => {
           const isSelected = value === selectedValue;
+          const isDisabled = disabledValues.includes(value);
           return (
             <div
               key={value}
               className={cn(
-                "h-10 flex items-center justify-center text-lg font-medium cursor-pointer transition-all duration-200 relative z-20",
-                "hover:bg-gray-50 select-none",
-                isSelected 
-                  ? "text-primary font-bold" 
-                  : "text-gray-600"
+                "h-10 flex items-center justify-center text-lg font-medium transition-all duration-200 relative z-20 select-none",
+                isDisabled
+                  ? "opacity-30 cursor-not-allowed text-gray-400"
+                  : "cursor-pointer hover:bg-gray-50",
+                isSelected && !isDisabled
+                  ? "text-primary font-bold"
+                  : isDisabled ? "text-gray-400" : "text-gray-600"
               )}
               style={{ scrollSnapAlign: 'center' }}
               onClick={() => {
-                if (!disabled) {
+                if (!disabled && !isDisabled) {
                   onValueChange(value);
                   scrollToIndex(index);
                 }
               }}
             >
               {value}
-              {unit && isSelected && (
+              {unit && isSelected && !isDisabled && (
                 <span className="ml-1 text-sm text-gray-400">{unit}</span>
               )}
             </div>
@@ -163,21 +173,99 @@ function WheelPicker({ values, selectedValue, onValueChange, disabled = false, u
   );
 }
 
-export function TimePicker({ 
-  date, 
-  setDate, 
-  className, 
-  disabled = false}: TimePickerProps) {
+export function TimePicker({
+  date,
+  setDate,
+  className,
+  disabled = false,
+  minDateTime}: TimePickerProps) {
   // Generate time options
-  const hours = Array.from({ length: 12 }, (_, i) => 
+  const hours = Array.from({ length: 12 }, (_, i) =>
     String(i === 0 ? 12 : i).padStart(2, '0')
   );
-  
-  const minutes = Array.from({ length: 60 }, (_, i) => 
+
+  const minutes = Array.from({ length: 60 }, (_, i) =>
     String(i).padStart(2, '0')
   );
-  
+
   const periods = ['AM', 'PM'];
+
+  // Calculate disabled hours, minutes, and periods based on minDateTime
+  const { disabledHours, disabledMinutes, disabledPeriods } = React.useMemo(() => {
+    if (!minDateTime || !date) {
+      return { disabledHours: [], disabledMinutes: [], disabledPeriods: [] };
+    }
+
+    // Check if the selected date is the same day as the minimum date
+    const selectedDateOnly = new Date(date);
+    selectedDateOnly.setHours(0, 0, 0, 0);
+
+    const minDateOnly = new Date(minDateTime);
+    minDateOnly.setHours(0, 0, 0, 0);
+
+    // If selected date is before minimum date, all times are disabled
+    if (selectedDateOnly < minDateOnly) {
+      return {
+        disabledHours: hours,
+        disabledMinutes: minutes,
+        disabledPeriods: periods
+      };
+    }
+
+    // If selected date is after minimum date, no times are disabled
+    if (selectedDateOnly > minDateOnly) {
+      return { disabledHours: [], disabledMinutes: [], disabledPeriods: [] };
+    }
+
+    // Same day - need to disable times before minDateTime
+    const minHour24 = minDateTime.getHours();
+    const minMinute = minDateTime.getMinutes();
+    const minPeriod = minHour24 >= 12 ? 'PM' : 'AM';
+    const minHour12 = minHour24 === 0 ? 12 : minHour24 > 12 ? minHour24 - 12 : minHour24;
+
+    // Get current selections
+    const currentHour = date.getHours();
+    const currentPeriod = currentHour >= 12 ? 'PM' : 'AM';
+    const currentHour12 = currentHour === 0 ? 12 : currentHour > 12 ? currentHour - 12 : currentHour;
+
+    // Disable AM if minimum time is in PM
+    const disabledPeriodsArr: string[] = [];
+    if (minPeriod === 'PM') {
+      disabledPeriodsArr.push('AM');
+    }
+
+    // Disable hours before minimum hour in the same period
+    const disabledHoursArr: string[] = [];
+    hours.forEach(hourStr => {
+      const hour = parseInt(hourStr);
+
+      if (currentPeriod === minPeriod) {
+        if (hour < minHour12) {
+          disabledHoursArr.push(hourStr);
+        }
+      } else if (currentPeriod === 'AM' && minPeriod === 'PM') {
+        // If current is AM but min is PM, all AM hours are disabled
+        disabledHoursArr.push(hourStr);
+      }
+    });
+
+    // Disable minutes before minimum minute if on same hour and period
+    const disabledMinutesArr: string[] = [];
+    if (currentPeriod === minPeriod && currentHour12 === minHour12) {
+      minutes.forEach(minuteStr => {
+        const minute = parseInt(minuteStr);
+        if (minute < minMinute) {
+          disabledMinutesArr.push(minuteStr);
+        }
+      });
+    }
+
+    return {
+      disabledHours: disabledHoursArr,
+      disabledMinutes: disabledMinutesArr,
+      disabledPeriods: disabledPeriodsArr
+    };
+  }, [minDateTime, date, hours, minutes, periods]);
 
   // Current values
   const currentHour = date ? 
@@ -242,6 +330,11 @@ export function TimePicker({
           <div className="text-center mb-4">
             <h3 className="text-lg font-semibold text-gray-800">Select Time</h3>
             <p className="text-sm text-gray-500">Scroll or tap to select</p>
+            {minDateTime && (
+              <p className="text-xs text-amber-600 mt-2 font-medium">
+                Must be at least 48 hours from now
+              </p>
+            )}
           </div>
           
           {/* Time display */}
@@ -260,11 +353,12 @@ export function TimePicker({
                 selectedValue={currentHour}
                 onValueChange={handleHourChange}
                 disabled={disabled}
+                disabledValues={disabledHours}
               />
             </div>
-            
+
             <div className="text-2xl font-bold text-gray-400 mt-6">:</div>
-            
+
             <div className="text-center">
               <label className="text-xs font-medium text-gray-500 block mb-2">Minute</label>
               <WheelPicker
@@ -272,9 +366,10 @@ export function TimePicker({
                 selectedValue={currentMinute}
                 onValueChange={handleMinuteChange}
                 disabled={disabled}
+                disabledValues={disabledMinutes}
               />
             </div>
-            
+
             <div className="text-center">
               <label className="text-xs font-medium text-gray-500 block mb-2">Period</label>
               <WheelPicker
@@ -282,6 +377,7 @@ export function TimePicker({
                 selectedValue={currentPeriod}
                 onValueChange={handlePeriodChange}
                 disabled={disabled}
+                disabledValues={disabledPeriods}
               />
             </div>
           </div>
@@ -290,22 +386,42 @@ export function TimePicker({
           <div className="mt-6 pt-4 border-t border-gray-100">
             <p className="text-xs text-gray-500 text-center mb-3">Quick Select</p>
             <div className="flex gap-2 justify-center">
-              {['9:00 AM', '12:00 PM', '3:00 PM', '6:00 PM'].map((time) => (
-                <Button
-                  key={time}
-                  variant="outline"
-                  size="sm"
-                  disabled={disabled}
-                  className="text-xs h-8 px-3"
-                  onClick={() => {
-                    const [timeStr, period] = time.split(' ');
-                    const [hour, minute] = timeStr.split(':');
-                    updateTime(hour, minute, period);
-                  }}
-                >
-                  {time}
-                </Button>
-              ))}
+              {['9:00 AM', '12:00 PM', '3:00 PM', '6:00 PM'].map((time) => {
+                const [timeStr, period] = time.split(' ');
+                const [hour, minute] = timeStr.split(':');
+
+                // Check if this quick time would be disabled
+                let isQuickTimeDisabled = false;
+                if (minDateTime && date) {
+                  const testDate = new Date(date);
+                  let hour24 = parseInt(hour);
+                  if (period === 'PM' && hour24 !== 12) {
+                    hour24 += 12;
+                  } else if (period === 'AM' && hour24 === 12) {
+                    hour24 = 0;
+                  }
+                  testDate.setHours(hour24, parseInt(minute), 0, 0);
+                  isQuickTimeDisabled = testDate < minDateTime;
+                }
+
+                return (
+                  <Button
+                    key={time}
+                    variant="outline"
+                    size="sm"
+                    disabled={disabled || isQuickTimeDisabled}
+                    className={cn(
+                      "text-xs h-8 px-3",
+                      isQuickTimeDisabled && "opacity-30"
+                    )}
+                    onClick={() => {
+                      updateTime(hour, minute, period);
+                    }}
+                  >
+                    {time}
+                  </Button>
+                );
+              })}
             </div>
           </div>
         </div>
