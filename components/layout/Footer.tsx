@@ -43,10 +43,10 @@ const Footer = () => {
           <div>
             <h3 className="font-medium text-sm text-[#0C8B44] mb-4">Company</h3>
             <ul className="space-y-2">
-              <li><Link href="/contact" className="text-sm hover:text-[#0C8B44]">Contact Elan</Link></li>
+              <li><Link href="/contact-us" className="text-sm hover:text-[#0C8B44]">Contact Elan</Link></li>
               <li><Link href="/faq" className="text-sm hover:text-[#0C8B44]">FAQs</Link></li>
               <li><Link href="/locations" className="text-sm hover:text-[#0C8B44]">Locations</Link></li>
-              <li><Link href="/blog" className="text-sm hover:text-[#0C8B44]">Blogs</Link></li>
+              <li><Link href="https://blog.elanroadtestrental.ca/" className="text-sm hover:text-[#0C8B44]">Blogs</Link></li>
             </ul>
           </div>
         </div>

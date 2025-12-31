@@ -10,6 +10,7 @@ import type {
   Coupon,
   AddressSearchResult,
   Booking,
+  RecentBooking,
   CreateBookingRequest,
   PricingBreakdown,
   TestType,
@@ -269,7 +270,7 @@ export const useAddressSearch = () => {
 
 export const useBookings = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
+  const [recentBooking, setRecentBooking] = useState<RecentBooking | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -279,7 +280,7 @@ export const useBookings = () => {
 
     try {
       const response = await bookingApi.getBookings();
-      
+
       if (response.success && response.data) {
         setBookings(response.data);
       } else {
@@ -292,20 +293,20 @@ export const useBookings = () => {
     }
   }, []);
 
-  const fetchRecentBookings = useCallback(async () => {
+  const fetchRecentBooking = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await bookingApi.getRecentBookings();
-      
-      if (response.success && response.data) {
-        setRecentBookings(response.data);
+      const response = await bookingApi.getRecentBooking();
+
+      if (response.success) {
+        setRecentBooking(response.data || null);
       } else {
-        setError(response.error?.message || 'Failed to fetch recent bookings');
+        setError(response.error?.message || 'Failed to fetch recent booking');
       }
     } catch (err) {
-      setError('Network error occurred while fetching recent bookings');
+      setError('Network error occurred while fetching recent booking');
     } finally {
       setLoading(false);
     }
@@ -313,8 +314,8 @@ export const useBookings = () => {
 
   useEffect(() => {
     fetchBookings();
-    fetchRecentBookings();
-  }, [fetchBookings, fetchRecentBookings]);
+    fetchRecentBooking();
+  }, [fetchBookings, fetchRecentBooking]);
 
   const getBookingById = useCallback((id: number): Booking | undefined => {
     return bookings.find(booking => booking.id === id);
@@ -326,11 +327,11 @@ export const useBookings = () => {
 
   return {
     bookings,
-    recentBookings,
+    recentBooking,
     loading,
     error,
     refetch: fetchBookings,
-    refetchRecent: fetchRecentBookings,
+    refetchRecent: fetchRecentBooking,
     getBookingById,
     getBookingsByStatus
   };

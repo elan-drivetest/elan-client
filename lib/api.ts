@@ -482,7 +482,7 @@ export const bookingApi = {
   
   // Bookings
   getBookings: () => bookingService.getBookings(),
-  getRecentBookings: () => bookingService.getRecentBookings(),
+  getRecentBooking: () => bookingService.getRecentBooking(),
   getBookingById: (id: number) => bookingService.getBookingById(id),
   createBooking: (bookingData: CreateBookingRequest) => bookingService.createBooking(bookingData),
   

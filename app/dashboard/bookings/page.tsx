@@ -27,7 +27,7 @@ interface APIBooking {
   total_price: number;
   status: "pending" | "confirmed" | "completed" | "cancelled" | "rescheduled" | "succeeded" | "expired";
   test_result?: "PASS" | "FAIL" | null;
-  coupon_code?: string;
+  coupon_code?: string | null;
   discount_amount?: number | null;
   is_rescheduled: boolean;
   timezone: string;
@@ -54,15 +54,17 @@ interface APIBooking {
   addon_duration?: number;
   created_at?: string;
   updated_at?: string;
-}
 
-// Mock instructor data structure
-interface Instructor {
-  id: number;
-  name: string;
-  avatar: string;
-  phone: string;
-  rating: number;
+  // Instructor fields from API
+  instructor_full_name?: string;
+  instructor_email?: string;
+  instructor_phone_number?: string;
+  instructor_vehicle_brand?: string;
+  instructor_vehicle_model?: string;
+  instructor_vehicle_year?: number;
+  instructor_vehicle_color?: string;
+  instructor_vehicle_license_plate?: string;
+  instructor_vehicle_image_url?: string;
 }
 
 // Refund Request Modal Component
@@ -266,12 +268,15 @@ const RefundRequestModal: React.FC<{
 // Component for individual booking card
 const BookingCard: React.FC<{
   booking: APIBooking;
-  instructor: Instructor | null;
-  isSearchingInstructor: boolean;
   onRefundSuccess: () => void;
   refundRequest?: RefundRequest | null;
-}> = ({ booking, instructor, isSearchingInstructor, onRefundSuccess, refundRequest }) => {
+}> = ({ booking, onRefundSuccess, refundRequest }) => {
   const [showRefundModal, setShowRefundModal] = useState(false);
+
+  // Determine if we have instructor info from the API
+  const hasInstructor = !!(booking.instructor_full_name && booking.instructor_phone_number);
+  const isSearchingInstructor = !hasInstructor && ['pending', 'confirmed', 'succeeded'].includes(booking.status);
+  const hasVehicleInfo = !!(booking.instructor_vehicle_brand || booking.instructor_vehicle_model);
   
   const formatPrice = (priceInCents: number): string => {
     return new Intl.NumberFormat('en-CA', {
@@ -471,7 +476,7 @@ const BookingCard: React.FC<{
               <div className="text-sm text-gray-600">{pickupInfo.address}</div>
               {booking.pickup_latitude && booking.pickup_longitude && (
                 <div className="text-xs text-gray-500">
-                  Coordinates: {booking.pickup_latitude.toFixed(4)}, {booking.pickup_longitude.toFixed(4)}
+                  Coordinates: {Number(booking.pickup_latitude).toFixed(4)}, {Number(booking.pickup_longitude).toFixed(4)}
                 </div>
               )}
             </div>
@@ -691,13 +696,13 @@ const BookingCard: React.FC<{
       {/* Instructor information */}
       <div className="bg-gray-50 p-4 rounded-lg flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="relative h-12 w-12 rounded-full overflow-hidden bg-gray-200">
-            {instructor ? (
-              <Image 
-                src={instructor.avatar} 
-                alt={instructor.name}
+          <div className="relative size-18 rounded-full overflow-hidden bg-gray-200">
+            {hasInstructor ? (
+              <Image
+                src="/instructor.png"
+                alt={booking.instructor_full_name || 'Instructor'}
                 fill
-                className="object-cover"
+                className="object-cover scale-125 hover:scale-100 transition-transform"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -711,8 +716,15 @@ const BookingCard: React.FC<{
           </div>
           <div>
             <div className="text-sm text-[#0C8B44]">Your Instructor</div>
-            {instructor ? (
+            {hasInstructor ? (
               <>
+                <div className="font-medium">{booking.instructor_full_name}</div>
+                {booking.instructor_phone_number && (
+                  <a href={`tel:${booking.instructor_phone_number}`} className="flex items-center text-sm hover:text-[#0C8B44] transition-colors">
+                    <Phone size={16} className="mr-1" />
+                    {booking.instructor_phone_number}
+                  </a>
+                )}
                 <div className="flex items-center gap-1 mt-1 mb-1">
                   {Array(5).fill(0).map((_, i) => (
                     <svg key={i} width="16" height="16" viewBox="0 0 16 16" fill="#FFBB00" xmlns="http://www.w3.org/2000/svg">
@@ -720,7 +732,6 @@ const BookingCard: React.FC<{
                     </svg>
                   ))}
                 </div>
-                <div className="font-medium">{instructor.name}</div>
               </>
             ) : (
               <div className="flex items-center gap-2 mt-1">
@@ -731,7 +742,7 @@ const BookingCard: React.FC<{
                   </>
                 ) : (
                   <>
-                    <span className="text-sm text-gray-600">Searching for instructor...</span>
+                    <span className="text-sm text-gray-600">No instructor assigned</span>
                     {booking.instructor_id && (
                       <span className="text-xs text-gray-500">(ID: {booking.instructor_id})</span>
                     )}
@@ -741,22 +752,31 @@ const BookingCard: React.FC<{
             )}
           </div>
         </div>
-        
-        <div className="flex items-center gap-6">
-          {instructor && (
-            <a href={`tel:${instructor.phone}`} className="flex items-center text-sm hover:text-[#0C8B44] transition-colors">
-              <Phone size={16} className="mr-1" />
-              {instructor.phone}
-            </a>
-          )}
-          
-          <div className="relative h-14 w-20">
-            <Image
-              src="/vehicle-lexus.png"
-              alt="Test vehicle"
-              fill
-              className="object-contain"
-            />
+
+        <div className="flex items-center gap-4">
+          {/* Vehicle info */}
+          <div className="flex items-center gap-3">
+            {hasVehicleInfo && (
+              <div className="text-right text-xs">
+                <div className="font-medium text-gray-900 capitalize">
+                  {booking.instructor_vehicle_brand} {booking.instructor_vehicle_model}
+                </div>
+                <div className="text-gray-500">
+                  {booking.instructor_vehicle_year} • {booking.instructor_vehicle_color}
+                </div>
+                <div className="text-gray-500">
+                  {booking.instructor_vehicle_license_plate}
+                </div>
+              </div>
+            )}
+            <div className="relative h-14 w-20 flex-shrink-0">
+              <Image
+                src={booking.instructor_vehicle_image_url || "/vehicle-lexus.png"}
+                alt={hasVehicleInfo ? `${booking.instructor_vehicle_brand} ${booking.instructor_vehicle_model}` : "Test vehicle"}
+                fill
+                className="object-contain"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -839,24 +859,6 @@ export default function Bookings() {
   const { user, isLoading: authLoading, isAuthenticated, checkAuthStatus } = useAuth();
   const router = useRouter();
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
-
-  // Mock instructor data - in real implementation, this would come from booking.instructor_id
-  const mockInstructors: Record<number, Instructor> = {
-    1: {
-      id: 1,
-      name: "Joe Morgan",
-      avatar: "/instructor.jpeg",
-      phone: "1-648-468-4589",
-      rating: 5
-    },
-    2: {
-      id: 2,
-      name: "Sarah Chen",
-      avatar: "/instructor.jpeg", 
-      phone: "1-647-123-4567",
-      rating: 5
-    }
-  };
 
   // Fetch refund requests for all bookings
   const fetchRefundRequests = useCallback(async () => {
@@ -1071,16 +1073,12 @@ export default function Bookings() {
               </div>
             ) : (
               filteredBookings.map((booking) => {
-                const instructor = booking.instructor_id ? mockInstructors[booking.instructor_id] : null;
-                const isSearchingInstructor = !booking.instructor_id && ['pending', 'confirmed', 'succeeded'].includes(booking.status);
                 const refundRequest = refundRequests[booking.id] || null;
 
                 return (
                   <BookingCard
                     key={booking.id}
                     booking={booking}
-                    instructor={instructor}
-                    isSearchingInstructor={isSearchingInstructor}
                     onRefundSuccess={fetchBookings}
                     refundRequest={refundRequest}
                   />

@@ -10,6 +10,7 @@ import type {
   CouponVerifyRequest,
   AddressSearchResult,
   Booking,
+  RecentBooking,
   CreateBookingRequest,
   DistanceCalculationRequest,
   DistanceCalculationResponse,
@@ -482,12 +483,16 @@ class BookingApiService {
     }
   }
 
-  async getRecentBookings(): Promise<ApiResponse<Booking[]>> {
+  async getRecentBooking(): Promise<ApiResponse<RecentBooking | null>> {
     try {
-      const response = await this.apiClient.get<Booking[]>('/bookings/recent');
-      return this.createSuccessResponse(response.data, 'Recent bookings fetched successfully');
+      const response = await this.apiClient.get<RecentBooking>('/bookings/recent');
+      return this.createSuccessResponse(response.data, 'Recent booking fetched successfully');
     } catch (error) {
       const apiError = this.handleApiError(error);
+      // Return null if no recent booking found (404)
+      if (apiError.status_code === 404) {
+        return this.createSuccessResponse(null, 'No recent booking found');
+      }
       return this.createErrorResponse(apiError);
     }
   }

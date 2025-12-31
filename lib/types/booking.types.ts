@@ -219,6 +219,24 @@ export interface Booking extends BaseEntity {
   payment_url?: string; // Stripe checkout URL for pending payments (actual field name from API)
 }
 
+// Extended booking response from /bookings/recent endpoint
+export interface RecentBooking extends Booking {
+  full_name: string;
+  phone_number: string;
+  email: string;
+  instructor_full_name?: string;
+  instructor_email?: string;
+  instructor_phone_number?: string;
+  instructor_vehicle_brand?: string;
+  instructor_vehicle_model?: string;
+  instructor_vehicle_year?: number;
+  instructor_vehicle_color?: string;
+  instructor_vehicle_license_plate?: string;
+  instructor_vehicle_image_url?: string;
+  total_ride_hour?: number;
+  ride_price?: number; // in cents
+}
+
 export interface CreateBookingRequest {
   test_center_id: number;
   road_test_doc_url: string;

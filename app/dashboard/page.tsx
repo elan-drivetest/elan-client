@@ -12,61 +12,64 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { ApiResponse } from "@/lib/types/auth.types";
 
-// Define the booking interface based on the API response
-interface APIBooking {
+// Define the booking interface based on the /bookings/recent API response
+interface RecentBookingResponse {
   id: number;
+  user_id: number;
+  full_name: string;
+  phone_number: string;
+  email: string;
   instructor_id: number | null;
+  instructor_full_name?: string;
+  instructor_email?: string;
+  instructor_phone_number?: string;
+  instructor_vehicle_brand?: string;
+  instructor_vehicle_model?: string;
+  instructor_vehicle_year?: number;
+  instructor_vehicle_color?: string;
+  instructor_vehicle_license_plate?: string;
+  instructor_vehicle_image_url?: string;
+  test_center_id: number;
+  test_center_name: string;
+  test_center_address: string;
+  test_type: "G2" | "G";
+  test_date: string;
+  meet_at_center: boolean;
+  pickup_address?: string;
+  pickup_latitude?: number;
+  pickup_longitude?: number;
+  pickup_distance?: number;
   base_price: number;
   pickup_price: number;
   addons_price: number;
   total_price: number;
   status: "pending" | "confirmed" | "completed" | "cancelled" | "rescheduled" | "succeeded" | "expired";
   test_result?: "PASS" | "FAIL" | null;
-  coupon_code?: string;
+  coupon_code?: string | null;
   discount_amount?: number | null;
   is_rescheduled: boolean;
-  timezone: string;
-  road_test_doc_url?: string;
-  g1_license_doc_url?: string;
-  
-  // Optional fields that may be missing
-  user_id?: number;
-  full_name?: string;
-  phone_number?: string;
-  test_center_id?: number;
-  test_center_name?: string;
-  test_center_address?: string;
-  test_type?: "G2" | "G";
-  test_date?: string;
-  meet_at_center?: boolean;
-  pickup_address?: string;
-  pickup_latitude?: number;
-  pickup_longitude?: number;
-  pickup_distance?: number;
   previous_booking_id?: number;
+  timezone: string;
   addon_id?: number;
   addon_duration?: number;
+  road_test_doc_url?: string;
+  g1_license_doc_url?: string;
+  payment_url?: string;
   created_at?: string;
   updated_at?: string;
-}
-
-// Mock instructor data structure
-interface Instructor {
-  id: number;
-  name: string;
-  avatar: string;
-  phone: string;
-  rating: number;
+  total_ride_hour?: number;
+  ride_price?: number;
 }
 
 // Enhanced booking card component for dashboard
-const DashboardBookingCard: React.FC<{ 
-  booking: APIBooking; 
-  instructor: Instructor | null; 
-  isSearchingInstructor: boolean;
-}> = ({ booking, instructor, isSearchingInstructor }) => {
+const DashboardBookingCard: React.FC<{
+  booking: RecentBookingResponse;
+}> = ({ booking }) => {
+  // Determine if we have instructor info from the API
+  const hasInstructor = !!(booking.instructor_full_name && booking.instructor_phone_number);
+  const isSearchingInstructor = !hasInstructor && ['pending', 'confirmed', 'succeeded'].includes(booking.status);
+  const hasVehicleInfo = !!(booking.instructor_vehicle_brand || booking.instructor_vehicle_model);
   
   const formatPrice = (priceInCents: number): string => {
     return new Intl.NumberFormat('en-CA', {
@@ -203,13 +206,13 @@ const DashboardBookingCard: React.FC<{
       {/* Instructor information */}
       <div className="bg-white rounded-lg p-4 flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
-          <div className="relative h-12 w-12 rounded-full overflow-hidden bg-gray-200">
-            {instructor ? (
-              <Image 
-                src={instructor.avatar} 
-                alt={instructor.name}
+          <div className="relative size-18 rounded-full overflow-hidden bg-gray-200">
+            {hasInstructor ? (
+              <Image
+                src="/instructor.png"
+                alt={booking.instructor_full_name || 'Instructor'}
                 fill
-                className="object-cover"
+                className="object-cover scale-125 hover:scale-100 transition-transform"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -223,8 +226,15 @@ const DashboardBookingCard: React.FC<{
           </div>
           <div>
             <div className="text-sm text-[#0C8B44]">Your Instructor</div>
-            {instructor ? (
+            {hasInstructor ? (
               <>
+                <div className="font-medium">{booking.instructor_full_name}</div>
+                  {hasInstructor && booking.instructor_phone_number && (
+                    <Link href={`tel:${booking.instructor_phone_number}`} className="flex items-center text-sm hover:text-[#0C8B44]">
+                      <Phone size={16} className="mr-1" />
+                      {booking.instructor_phone_number}
+                    </Link>
+                  )}
                 <div className="flex items-center gap-1 mt-1 mb-1">
                   {Array(5).fill(0).map((_, i) => (
                     <svg key={i} width="16" height="16" viewBox="0 0 16 16" fill="#FFBB00" xmlns="http://www.w3.org/2000/svg">
@@ -232,7 +242,6 @@ const DashboardBookingCard: React.FC<{
                     </svg>
                   ))}
                 </div>
-                <div className="font-medium">{instructor.name}</div>
               </>
             ) : (
               <div className="flex items-center gap-2 mt-1">
@@ -242,28 +251,39 @@ const DashboardBookingCard: React.FC<{
                     <span className="text-sm text-gray-600">Connecting...</span>
                   </>
                 ) : (
-                  <span className="text-sm text-gray-600">Searching for instructor...</span>
+                  <span className="text-sm text-gray-600">No instructor assigned</span>
                 )}
               </div>
             )}
           </div>
         </div>
-        
+
         <div className="flex items-center gap-4">
-          {instructor && (
-            <Link href={`tel:${instructor.phone}`} className="flex items-center text-sm hover:text-[#0C8B44]">
-              <Phone size={16} className="mr-1" />
-              {instructor.phone}
-            </Link>
-          )}
+
           
-          <div className="relative h-14 w-20">
-            <Image
-              src="/vehicle-lexus.png"
-              alt="Test vehicle"
-              fill
-              className="object-contain"
-            />
+          {/* Vehicle info */}
+          <div className="flex items-center gap-3">
+            {hasVehicleInfo && (
+              <div className="text-right text-xs">
+                <div className="font-medium text-gray-900 capitalize">
+                  {booking.instructor_vehicle_brand} {booking.instructor_vehicle_model}
+                </div>
+                <div className="text-gray-500">
+                  {booking.instructor_vehicle_year} • {booking.instructor_vehicle_color}
+                </div>
+                <div className="text-gray-500">
+                  {booking.instructor_vehicle_license_plate}
+                </div>
+              </div>
+            )}
+            <div className="relative h-14 w-20 flex-shrink-0">
+              <Image
+                src={booking.instructor_vehicle_image_url || "/vehicle-lexus.png"}
+                alt={hasVehicleInfo ? `${booking.instructor_vehicle_brand} ${booking.instructor_vehicle_model}` : "Test vehicle"}
+                fill
+                className="object-contain"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -294,61 +314,29 @@ export default function Dashboard() {
   const { user, isLoading, isAuthenticated, checkAuthStatus } = useAuth();
   const router = useRouter();
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
-  const [recentBooking, setRecentBooking] = useState<APIBooking | null>(null);
+  const [recentBooking, setRecentBooking] = useState<RecentBookingResponse | null>(null);
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [bookingsError, setBookingsError] = useState<string | null>(null);
 
-  // Mock instructor data - in real implementation, this would come from booking.instructor_id
-  const mockInstructors: Record<number, Instructor> = {
-    1: {
-      id: 1,
-      name: "Joe Morgan",
-      avatar: "/instructor.jpeg",
-      phone: "1-648-468-4589",
-      rating: 5
-    },
-    2: {
-      id: 2,
-      name: "Sarah Chen",
-      avatar: "/instructor.jpeg", 
-      phone: "1-647-123-4567",
-      rating: 5
-    }
-  };
-
-  // Fetch most recent booking
+  // Fetch most recent booking using dedicated endpoint
   const fetchRecentBooking = async () => {
     try {
       setBookingsLoading(true);
       setBookingsError(null);
-      
-      const response: ApiResponse<APIBooking[]> = await bookingApi.getBookings();
-      
-      if (response.success && response.data && response.data.length > 0) {
-        // Sort bookings by created_at date (most recent first) or by ID if no date
-        const sortedBookings = response.data.sort((a, b) => {
-          if (a.created_at && b.created_at) {
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-          }
-          // Fallback to ID sorting (higher ID = more recent)
-          return b.id - a.id;
-        });
-        
-        // Get the most recent active booking, or any booking if no active ones
-        const activeBooking = sortedBookings.find(booking => 
-          ['pending', 'confirmed', 'succeeded'].includes(booking.status)
-        );
-        
-        setRecentBooking(activeBooking || sortedBookings[0]);
+
+      const response = await bookingApi.getRecentBooking();
+
+      if (response.success) {
+        setRecentBooking(response.data || null);
       } else {
         setRecentBooking(null);
         if (response.error) {
-          setBookingsError(response.error.message || 'Failed to fetch bookings');
+          setBookingsError(response.error.message || 'Failed to fetch recent booking');
         }
       }
     } catch (err) {
       console.error('Error fetching recent booking:', err);
-      setBookingsError('Network error occurred while fetching bookings');
+      setBookingsError('Network error occurred while fetching booking');
       setRecentBooking(null);
     } finally {
       setBookingsLoading(false);
@@ -452,11 +440,7 @@ export default function Dashboard() {
             ) : recentBooking ? (
               <>
                 <h2 className="text-xl font-semibold mb-4">Your Recent Booking</h2>
-                <DashboardBookingCard 
-                  booking={recentBooking} 
-                  instructor={recentBooking.instructor_id ? mockInstructors[recentBooking.instructor_id] : null}
-                  isSearchingInstructor={!recentBooking.instructor_id && ['pending', 'confirmed', 'succeeded'].includes(recentBooking.status)}
-                />
+                <DashboardBookingCard booking={recentBooking} />
               </>
             ) : (
               <div className="bg-gray-100 rounded-lg p-6 h-64 flex items-center justify-center">
