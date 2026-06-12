@@ -80,29 +80,32 @@ export default function LoginPage() {
     }
     
     setIsLoading(true);
-    
+
     try {
       // Just call login endpoint
       const result = await authApi.login(formData);
-      
+
       if (result.success) {
         console.log('Login successful, checking auth status...');
         // Let AuthContext fetch user data
         await checkAuthStatus();
-        // Redirect to dashboard
+        // Redirect to dashboard. Keep isLoading=true so the button spinner
+        // stays visible through navigation instead of flickering back to
+        // "Log in" while the dashboard loads.
         router.push("/dashboard");
-      } else {
-        // Show backend error
-        const errorMessage = handleApiError(result.error);
-        setErrors(prev => ({ ...prev, general: errorMessage }));
+        return;
       }
+
+      // Show backend error
+      const errorMessage = handleApiError(result.error);
+      setErrors(prev => ({ ...prev, general: errorMessage }));
+      setIsLoading(false);
     } catch (error) {
       console.error('Login exception:', error);
       setErrors(prev => ({
         ...prev,
         general: "An unexpected error occurred. Please try again."
       }));
-    } finally {
       setIsLoading(false);
     }
   };

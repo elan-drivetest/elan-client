@@ -326,9 +326,9 @@ export default function Profile() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex min-h-screen bg-white">
+      <div className="flex flex-col md:flex-row min-h-screen bg-white">
         <DashboardSidebar />
-        <div className="flex-1 p-8 flex items-center justify-center">
+        <div className="flex-1 p-4 sm:p-6 md:p-8 flex items-center justify-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#0C8B44]"></div>
         </div>
       </div>
@@ -338,9 +338,9 @@ export default function Profile() {
   // Unauthenticated state
   if (!isAuthenticated || !user) {
     return (
-      <div className="flex min-h-screen bg-white">
+      <div className="flex flex-col md:flex-row min-h-screen bg-white">
         <DashboardSidebar />
-        <div className="flex-1 p-8 flex items-center justify-center">
+        <div className="flex-1 p-4 sm:p-6 md:p-8 flex items-center justify-center">
           <div className="text-center">
             <div className="text-xl font-semibold text-gray-600 mb-4">Authentication Required</div>
             <div className="text-gray-500 mb-6">Please log in to access your profile.</div>
@@ -360,12 +360,12 @@ export default function Profile() {
   const currentProfilePicture = uploadedFile?.url || profilePreview || user.photo_url;
   
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex flex-col md:flex-row min-h-screen bg-white">
       {/* Sidebar */}
       <DashboardSidebar />
       
       {/* Main content */}
-      <div className="flex-1 p-8 max-w-4xl">
+      <div className="flex-1 p-4 sm:p-6 md:p-8 max-w-4xl mx-auto w-full">
         <div className="flex items-center gap-4 mb-8">
           <div className="relative">
             <div className="w-20 h-20 bg-[#0C8B44] rounded-full flex items-center justify-center relative overflow-hidden">
@@ -573,7 +573,7 @@ export default function Profile() {
           </>
         ) : (
           /* Password Tab */
-          <div className="max-w-md">
+          <div className="mb-10">
             <form onSubmit={handleUpdatePassword}>
               {/* Success/Error Messages */}
               {passwordSuccess && (

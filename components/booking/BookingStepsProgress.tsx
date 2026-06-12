@@ -16,17 +16,23 @@ type Step = {
 interface BookingStepsProgressProps {
   steps: Step[];
   className?: string;
+  // When true, the progress bar is read-only: the Back button is hidden and
+  // step clicks are disabled. Used on the confirmation page so a completed
+  // booking can't be navigated back into and re-submitted.
+  disableNavigation?: boolean;
 }
 
 export default function BookingStepsProgress({
   steps,
   className,
+  disableNavigation = false,
 }: BookingStepsProgressProps) {
   const router = useRouter();
   const { currentStep, setCurrentStep } = useBooking();
-  
+
   // Handler for navigating to a previous step
   const handleStepClick = (stepId: number, path: string) => {
+    if (disableNavigation) return;
     // Only allow navigating to previous steps or current step
     if (stepId <= currentStep) {
       setCurrentStep(stepId);
@@ -46,8 +52,8 @@ export default function BookingStepsProgress({
 
   return (
     <div className={cn("w-full mb-8", className)}>
-      {currentStep > 1 && (
-        <button 
+      {!disableNavigation && currentStep > 1 && (
+        <button
           onClick={handleBack}
           className="flex items-center text-sm text-gray-600 hover:text-[#0C8B44] mb-4 transition-colors"
         >
@@ -64,10 +70,12 @@ export default function BookingStepsProgress({
 
           return (
             <React.Fragment key={step.id}>
-              <div 
+              <div
                 className={cn(
                   "flex flex-col items-center relative",
-                  step.id <= currentStep ? "cursor-pointer" : "cursor-not-allowed"
+                  disableNavigation
+                    ? "cursor-default"
+                    : step.id <= currentStep ? "cursor-pointer" : "cursor-not-allowed"
                 )}
                 onClick={() => handleStepClick(step.id, step.path)}
               >

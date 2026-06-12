@@ -19,9 +19,9 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ href, icon, text, isActive })
     <Link 
       href={href} 
       className={cn(
-        "flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-colors",
-        isActive 
-          ? "bg-[#0C8B44]/10 text-[#0C8B44]" 
+        "flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0",
+        isActive
+          ? "bg-[#0C8B44]/10 text-[#0C8B44]"
           : "text-gray-700 hover:bg-gray-100"
       )}
     >
@@ -53,8 +53,10 @@ export default function DashboardSidebar() {
   ];
 
   return (
-    <div className="w-52 bg-white border-r border-gray-200 p-4">
-      <nav className="space-y-2">
+    <div className="w-full md:w-52 flex-shrink-0 bg-white border-b md:border-b-0 md:border-r border-gray-200">
+      {/* Mobile: horizontal scrollable tab bar. Desktop: sticky vertical sidebar
+          offset below the (variable-height) global navbar. */}
+      <nav className="flex md:block gap-2 md:gap-0 md:space-y-2 p-3 md:p-4 overflow-x-auto md:overflow-visible md:sticky md:top-[calc(var(--navbar-height,96px)+1rem)]">
         {routes.map((route) => (
           <SidebarLink 
             key={route.href}

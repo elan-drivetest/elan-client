@@ -17,6 +17,7 @@ import type {
   RefundRequest,
   CreateRefundRequestRequest,
   RefundRequestQueryParams} from '@/lib/types/booking.types';
+import { DriveTestCenterStatus } from '@/lib/types/booking.types';
 
 // ============================================================================
 // DRIVE TEST CENTERS HOOK
@@ -35,7 +36,13 @@ export const useDriveTestCenters = (enabled: boolean = true) => {
       const response = await bookingApi.getDriveTestCenters();
 
       if (response.success && response.data) {
-        setCenters(response.data);
+        // The public GET /drive-test-centers omits `status` (it's serialized
+        // for the admin group only), so a strict ACTIVE check would drop every
+        // center. Exclude only centers explicitly marked INACTIVE.
+        const activeCenters = response.data.filter(
+          (center) => center.status !== DriveTestCenterStatus.INACTIVE
+        );
+        setCenters(activeCenters);
       } else {
         // Silently handle 401 errors (unauthenticated users)
         // Test centers will be loaded later when user authenticates

@@ -180,14 +180,18 @@ export default function TestDetails() {
     }
   }, [isAuthenticated, user, bookingState.userDetails?.email, updateBookingState]);
   
-  // Redirect to booking-details if user hasn't completed that step
-  // Don't check isAuthenticated directly - let booking-details handle auth
+  // Redirect to booking-details if user hasn't completed that step.
+  // Skip the redirect while the user is authenticated: they just completed
+  // login, and userDetails may not have synced into booking state yet. The
+  // auto-populate effect above fills it from the authoritative `user` object.
+  // Without this guard, a freshly-logged-in user bounces back on their first
+  // click before the details land.
   useEffect(() => {
-    if (!bookingState.userDetails?.email) {
+    if (!isAuthenticated && !bookingState.userDetails?.email) {
       // User hasn't completed the booking-details step, redirect them there
       router.push("/book-road-test-vehicle/booking-details");
     }
-  }, [bookingState.userDetails?.email, router]);
+  }, [isAuthenticated, bookingState.userDetails?.email, router]);
   
   // Mock user data - use data from context if available
   const userData = {
@@ -417,6 +421,11 @@ export default function TestDetails() {
               success={roadTestUploadSuccess}
               isUploading={isUploadingRoadTest}
               maxSizeMB={5}
+              existingFile={roadTestDocUrl ? {
+                name: bookingState.documents?.roadTestFileMetadata?.originalName || "Road test confirmation",
+                size: bookingState.documents?.roadTestFileMetadata?.size,
+                url: roadTestDocUrl
+              } : undefined}
             />
 
             <DocumentUpload
@@ -429,6 +438,11 @@ export default function TestDetails() {
               success={licenseUploadSuccess}
               isUploading={isUploadingLicense}
               maxSizeMB={5}
+              existingFile={licenseDocUrl ? {
+                name: bookingState.documents?.licenseFileMetadata?.originalName || "Ontario license",
+                size: bookingState.documents?.licenseFileMetadata?.size,
+                url: licenseDocUrl
+              } : undefined}
             />
           </div>
           

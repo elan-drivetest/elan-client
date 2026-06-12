@@ -4,13 +4,11 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/lib/context/AuthContext';
-import { useBooking } from '@/lib/context/BookingContext';
 
 function ConfirmEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
-  const { refetchBookingData } = useBooking();
 
   const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -53,10 +51,10 @@ function ConfirmEmailContent() {
           // Step 3: Set user in auth context
           login(userResult.data);
 
-          // Step 3.5: Refetch booking data now that user is authenticated
-          refetchBookingData();
-
-          // Step 4: Show success and redirect after a brief delay
+          // Step 4: Show success and redirect after a brief delay.
+          // The destination (/book-road-test-vehicle/booking-details) lives
+          // inside BookingProvider and fetches its own data on mount, so we
+          // don't (and can't) use booking context here.
           setStatus('success');
 
           setTimeout(() => {
@@ -80,7 +78,7 @@ function ConfirmEmailContent() {
     };
 
     confirmEmail();
-  }, [searchParams, login, router, refetchBookingData]);
+  }, [searchParams, login, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">

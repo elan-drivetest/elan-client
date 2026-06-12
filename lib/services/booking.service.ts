@@ -53,12 +53,6 @@ class BookingApiService {
     this.failedQueue = [];
   }
 
-  // Helper to check if refresh token cookie exists
-  private hasRefreshToken(): boolean {
-    if (typeof document === 'undefined') return false;
-    return document.cookie.includes('_elanAuthR=');
-  }
-
   // ============================================================================
   // INTERCEPTORS SETUP
   // ============================================================================
@@ -99,11 +93,11 @@ class BookingApiService {
             return Promise.reject(error);
           }
 
-          // Don't attempt refresh if no refresh token exists (user is unauthenticated)
-          if (!this.hasRefreshToken()) {
-            console.log('🚫 No refresh token available (booking service) - user is unauthenticated');
-            return Promise.reject(error);
-          }
+          // NOTE: No client-side refresh-token pre-check here. The _elanAuthR
+          // cookie is set by the API domain and/or is HttpOnly, so it is not
+          // readable via document.cookie on the frontend — checking it would
+          // always report "missing" and wrongly skip the refresh. We attempt
+          // the refresh and let the backend reject with 401 if it is invalid.
 
           // If we're already refreshing, queue this request
           if (this.isRefreshing) {

@@ -204,7 +204,7 @@ const DashboardBookingCard: React.FC<{
       </div>
       
       {/* Instructor information */}
-      <div className="bg-white rounded-lg p-4 flex items-center justify-between mb-4">
+      <div className="bg-white rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div className="flex items-center gap-4">
           <div className="relative size-18 rounded-full overflow-hidden bg-gray-200">
             {hasInstructor ? (
@@ -370,9 +370,9 @@ export default function Dashboard() {
   // Show loading state only while actually loading or during initial auth check
   if (isLoading || (!user && !hasCheckedAuth)) {
     return (
-      <div className="flex min-h-screen bg-white">
+      <div className="flex flex-col md:flex-row min-h-screen bg-white">
         <DashboardSidebar />
-        <div className="flex-1 p-8 flex items-center justify-center">
+        <div className="flex-1 p-4 sm:p-6 md:p-8 flex items-center justify-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#0C8B44]"></div>
         </div>
       </div>
@@ -382,9 +382,9 @@ export default function Dashboard() {
   // Show login prompt if we've checked auth and user is not authenticated
   if (hasCheckedAuth && !isAuthenticated) {
     return (
-      <div className="flex min-h-screen bg-white">
+      <div className="flex flex-col md:flex-row min-h-screen bg-white">
         <DashboardSidebar />
-        <div className="flex-1 p-8 flex items-center justify-center">
+        <div className="flex-1 p-4 sm:p-6 md:p-8 flex items-center justify-center">
           <div className="text-center">
             <div className="text-xl font-semibold text-gray-600 mb-4">Authentication Required</div>
             <div className="text-gray-500 mb-6">Please log in to access your dashboard.</div>
@@ -402,12 +402,12 @@ export default function Dashboard() {
 
   // Show dashboard content
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex flex-col md:flex-row min-h-screen bg-white">
       {/* Sidebar */}
       <DashboardSidebar />
       
       {/* Main content */}
-      <div className="flex-1 p-8">
+      <div className="flex-1 p-4 sm:p-6 md:p-8 max-w-6xl mx-auto w-full">
         <h1 className="text-2xl font-bold mb-6">
           Welcome back, {user?.full_name || 'there'}!
         </h1>

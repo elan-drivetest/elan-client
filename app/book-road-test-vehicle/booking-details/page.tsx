@@ -164,8 +164,10 @@ export default function BookingDetails() {
         // Set user in auth context
         login(result.data);
 
-        // Call /me endpoint to ensure user data is fully loaded
-        await checkAuthStatus();
+        // Call /me endpoint to ensure user data is fully loaded.
+        // The login response may not include full profile fields, so prefer
+        // the authoritative /me profile and fall back to the login payload.
+        const profile = (await checkAuthStatus()) || result.data;
 
         // Refetch booking data now that user is authenticated
         refetchBookingData();
@@ -173,9 +175,9 @@ export default function BookingDetails() {
         // Store user data in booking state
         updateBookingState({
           userDetails: {
-            fullName: result.data.full_name,
-            email: result.data.email,
-            phone: result.data.phone_number || "",
+            fullName: profile.full_name,
+            email: profile.email,
+            phone: profile.phone_number || "",
           }
         });
 

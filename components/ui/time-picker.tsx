@@ -25,149 +25,222 @@ interface WheelPickerProps {
   disabledValues?: string[]; // Array of disabled values (for 48-hour validation)
 }
 
-// iOS-style wheel picker component
+// Wheel geometry
+const ITEM_HEIGHT = 40; // px height of each row
+const VISIBLE_ITEMS = 5; // odd number so there's a clear center row
+const SNAP_TRANSITION = "transform 320ms cubic-bezier(0.23, 1, 0.32, 1)";
+
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+// iOS-style inertial wheel picker.
+//
+// Implemented with a single CSS transform (translateY) on the list plus a
+// per-item rotateX for the curved-drum look — NOT native scroll. This avoids
+// the scroll/snap/effect race that made the old version shaky and made taps
+// get reverted. `position` is a continuous float index; the centered item is
+// Math.round(position). Drag moves it live, release applies momentum + snaps
+// to the nearest enabled value, and tapping a row animates straight to it.
 function WheelPicker({ values, selectedValue, onValueChange, disabled = false, unit, disabledValues = [] }: WheelPickerProps) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
+  const centerIndex = Math.floor(VISIBLE_ITEMS / 2);
+  const containerHeight = ITEM_HEIGHT * VISIBLE_ITEMS;
+
+  const selectedIndex = Math.max(0, values.findIndex(v => v === selectedValue));
+
+  const [position, setPosition] = React.useState<number>(selectedIndex);
   const [isDragging, setIsDragging] = React.useState(false);
-  const [startY, setStartY] = React.useState(0);
-  const [scrollTop, setScrollTop] = React.useState(0);
-  
-  const itemHeight = 40; // Height of each item
-  const visibleItems = 5; // Number of visible items
-  const centerIndex = Math.floor(visibleItems / 2);
-  
-  // Calculate scroll position based on selected value
+
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const positionRef = React.useRef(position);
+  positionRef.current = position;
+  const draggingRef = React.useRef(false);
+  const justDraggedRef = React.useRef(false);
+  const lastWheelRef = React.useRef(0);
+
+  const isIndexDisabled = React.useCallback(
+    (i: number) => i < 0 || i >= values.length || disabledValues.includes(values[i]),
+    [values, disabledValues]
+  );
+
+  // Nearest selectable index to a (possibly fractional) target, searching outward.
+  const nearestEnabled = React.useCallback((target: number) => {
+    const start = clamp(Math.round(target), 0, values.length - 1);
+    if (!isIndexDisabled(start)) return start;
+    for (let d = 1; d < values.length; d++) {
+      if (start - d >= 0 && !isIndexDisabled(start - d)) return start - d;
+      if (start + d < values.length && !isIndexDisabled(start + d)) return start + d;
+    }
+    return start;
+  }, [values.length, isIndexDisabled]);
+
+  const commitIndex = React.useCallback((i: number) => {
+    setPosition(i);
+    positionRef.current = i;
+    if (values[i] !== undefined && values[i] !== selectedValue && !isIndexDisabled(i)) {
+      onValueChange(values[i]);
+    }
+  }, [values, selectedValue, isIndexDisabled, onValueChange]);
+
+  // Keep the wheel aligned with external value changes (but never fight an active drag).
   React.useEffect(() => {
-    const selectedIndex = values.findIndex(v => v === selectedValue);
-    if (selectedIndex !== -1 && containerRef.current) {
-      const scrollPosition = selectedIndex * itemHeight;
-      containerRef.current.scrollTop = scrollPosition;
+    if (!draggingRef.current) {
+      setPosition(selectedIndex);
+      positionRef.current = selectedIndex;
     }
-  }, [selectedValue, values, itemHeight]);
+  }, [selectedIndex]);
 
-  // Handle scroll to snap to nearest item
-  const handleScroll = React.useCallback(() => {
-    if (!containerRef.current || disabled) return;
-
-    const scrollTop = containerRef.current.scrollTop;
-    const selectedIndex = Math.round(scrollTop / itemHeight);
-    const clampedIndex = Math.max(0, Math.min(selectedIndex, values.length - 1));
-
-    // Skip disabled values
-    if (disabledValues.includes(values[clampedIndex])) {
-      return;
-    }
-
-    if (values[clampedIndex] !== selectedValue) {
-      onValueChange(values[clampedIndex]);
-    }
-  }, [values, selectedValue, onValueChange, itemHeight, disabled, disabledValues]);
-
-  // Smooth scroll to position
-  const scrollToIndex = (index: number) => {
-    if (!containerRef.current) return;
-    containerRef.current.scrollTo({
-      top: index * itemHeight,
-      behavior: 'smooth'
-    });
-  };
-
-  // Handle mouse/touch events
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (disabled) return;
-    setIsDragging(true);
-    setStartY(e.clientY);
-    setScrollTop(containerRef.current?.scrollTop || 0);
-  };
-
-  const handleMouseMove = React.useCallback((e: MouseEvent) => {
-    if (!isDragging || !containerRef.current || disabled) return;
-    
-    const deltaY = e.clientY - startY;
-    containerRef.current.scrollTop = scrollTop - deltaY;
-  }, [isDragging, startY, scrollTop, disabled]);
-
-  const handleMouseUp = React.useCallback(() => {
-    setIsDragging(false);
-    handleScroll();
-  }, [handleScroll]);
-
+  // Mouse-wheel / trackpad support via a non-passive native listener (so we can
+  // preventDefault and not scroll the page behind the popover).
+  const apiRef = React.useRef({ disabled, nearestEnabled, commitIndex });
+  apiRef.current = { disabled, nearestEnabled, commitIndex };
   React.useEffect(() => {
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const api = apiRef.current;
+      if (api.disabled) return;
+      e.preventDefault();
+      const now = performance.now();
+      if (now - lastWheelRef.current < 70) return; // throttle rapid wheel bursts
+      lastWheelRef.current = now;
+      const dir = e.deltaY > 0 ? 1 : -1;
+      api.commitIndex(api.nearestEnabled(Math.round(positionRef.current) + dir));
     };
-  }, [handleMouseMove, handleMouseUp]);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (disabled) return;
+    // NOTE: do NOT preventDefault here — that would swallow the click used for tap-to-select.
+    draggingRef.current = true;
+    setIsDragging(true);
+    justDraggedRef.current = false;
+
+    const startY = e.clientY;
+    const startPos = positionRef.current;
+    let lastY = e.clientY;
+    let lastT = performance.now();
+    let velocity = 0; // index units per ms
+    let moved = false;
+    let liveIndex = clamp(Math.round(startPos), 0, values.length - 1);
+
+    const move = (ev: PointerEvent) => {
+      const dy = ev.clientY - startY;
+      if (Math.abs(dy) > 3) moved = true;
+      const next = clamp(startPos - dy / ITEM_HEIGHT, -0.6, values.length - 1 + 0.6);
+      setPosition(next);
+      positionRef.current = next;
+
+      const now = performance.now();
+      const dt = now - lastT;
+      if (dt > 0) {
+        velocity = (-(ev.clientY - lastY) / ITEM_HEIGHT) / dt;
+        lastY = ev.clientY;
+        lastT = now;
+      }
+
+      // Update the big time display live as the wheel crosses each row.
+      const rounded = clamp(Math.round(next), 0, values.length - 1);
+      if (rounded !== liveIndex && !isIndexDisabled(rounded)) {
+        liveIndex = rounded;
+        if (values[rounded] !== selectedValue) onValueChange(values[rounded]);
+      }
+    };
+
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      draggingRef.current = false;
+      setIsDragging(false);
+      if (moved) {
+        // Suppress the click that fires right after a drag so it doesn't re-select.
+        justDraggedRef.current = true;
+        window.setTimeout(() => { justDraggedRef.current = false; }, 60);
+        const projected = positionRef.current + velocity * 140; // momentum
+        commitIndex(nearestEnabled(projected));
+      }
+      // A pure tap (not moved) falls through to the row's onClick handler.
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  };
+
+  const handleItemClick = (index: number) => {
+    if (disabled || isIndexDisabled(index) || justDraggedRef.current) return;
+    commitIndex(index);
+  };
+
+  const transition = isDragging ? "none" : SNAP_TRANSITION;
 
   return (
-    <div className="relative w-20">
-      {/* Selection indicator */}
-      <div 
-        className="absolute inset-x-0 bg-primary/20 border-2 border-primary rounded-lg pointer-events-none z-10 flex items-center justify-center"
-        style={{
-          top: `${centerIndex * itemHeight}px`,
-          height: `${itemHeight}px`
-        }}
+    <div className="relative w-20" style={{ height: containerHeight }}>
+      {/* Center selection band */}
+      <div
+        className="absolute inset-x-0 z-10 rounded-lg border-y-2 border-primary/60 bg-primary/5 pointer-events-none"
+        style={{ top: centerIndex * ITEM_HEIGHT, height: ITEM_HEIGHT }}
       />
-      
-      {/* Scrollable container */}
+
+      {/* Wheel viewport */}
       <div
         ref={containerRef}
         className={cn(
-          "h-48 overflow-hidden scroll-smooth",
-          disabled && "opacity-50"
+          "relative h-full overflow-hidden select-none touch-none",
+          disabled ? "opacity-50 cursor-not-allowed" : "cursor-grab active:cursor-grabbing"
         )}
         style={{
-          scrollSnapType: 'y mandatory',
-          maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)'
+          perspective: "700px",
+          maskImage: "linear-gradient(to bottom, transparent, black 25%, black 75%, transparent)",
+          WebkitMaskImage: "linear-gradient(to bottom, transparent, black 25%, black 75%, transparent)",
         }}
-        onScroll={handleScroll}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handlePointerDown}
       >
-        {/* Padding items for smooth scrolling */}
-        {Array.from({ length: centerIndex }, (_, i) => (
-          <div key={`padding-top-${i}`} className="h-10" />
-        ))}
-        
-        {/* Actual values */}
-        {values.map((value, index) => {
-          const isSelected = value === selectedValue;
-          const isDisabled = disabledValues.includes(value);
-          return (
-            <div
-              key={value}
-              className={cn(
-                "h-10 flex items-center justify-center text-lg font-medium transition-all duration-200 relative z-20 select-none",
-                isDisabled
-                  ? "opacity-30 cursor-not-allowed text-gray-400"
-                  : "cursor-pointer hover:bg-gray-50",
-                isSelected && !isDisabled
-                  ? "text-primary font-bold"
-                  : isDisabled ? "text-gray-400" : "text-gray-600"
-              )}
-              style={{ scrollSnapAlign: 'center' }}
-              onClick={() => {
-                if (!disabled && !isDisabled) {
-                  onValueChange(value);
-                  scrollToIndex(index);
-                }
-              }}
-            >
-              {value}
-              {unit && isSelected && !isDisabled && (
-                <span className="ml-1 text-sm text-gray-400">{unit}</span>
-              )}
-            </div>
-          );
-        })}
-        
-        {/* Padding items for smooth scrolling */}
-        {Array.from({ length: centerIndex }, (_, i) => (
-          <div key={`padding-bottom-${i}`} className="h-10" />
-        ))}
+        <div
+          style={{
+            transform: `translateY(${(centerIndex - position) * ITEM_HEIGHT}px)`,
+            transition,
+            transformStyle: "preserve-3d",
+          }}
+        >
+          {values.map((value, index) => {
+            const dist = index - position;
+            const abs = Math.abs(dist);
+            const isSelected = Math.round(position) === index;
+            const isDisabled = disabledValues.includes(value);
+            const rotate = clamp(dist * 22, -70, 70);
+            const opacity = abs > 2.5 ? 0 : Math.max(0.15, 1 - abs * 0.33);
+            const scale = Math.max(0.8, 1 - abs * 0.07);
+            return (
+              <div
+                key={value}
+                onClick={() => handleItemClick(index)}
+                className={cn(
+                  "flex items-center justify-center text-lg font-medium",
+                  isDisabled
+                    ? "text-gray-300 cursor-not-allowed"
+                    : "cursor-pointer",
+                  isSelected && !isDisabled ? "text-primary font-bold" : "text-gray-600"
+                )}
+                style={{
+                  height: ITEM_HEIGHT,
+                  transform: `rotateX(${rotate}deg) scale(${scale})`,
+                  opacity,
+                  transition: isDragging
+                    ? "none"
+                    : "transform 320ms cubic-bezier(0.23, 1, 0.32, 1), opacity 320ms ease",
+                  backfaceVisibility: "hidden",
+                }}
+              >
+                {value}
+                {unit && isSelected && !isDisabled && (
+                  <span className="ml-1 text-sm text-gray-400">{unit}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -179,16 +252,18 @@ export function TimePicker({
   className,
   disabled = false,
   minDateTime}: TimePickerProps) {
-  // Generate time options
-  const hours = Array.from({ length: 12 }, (_, i) =>
-    String(i === 0 ? 12 : i).padStart(2, '0')
+  // Generate time options (stable references so they don't churn memo deps)
+  const hours = React.useMemo(
+    () => Array.from({ length: 12 }, (_, i) => String(i === 0 ? 12 : i).padStart(2, '0')),
+    []
   );
 
-  const minutes = Array.from({ length: 60 }, (_, i) =>
-    String(i).padStart(2, '0')
+  const minutes = React.useMemo(
+    () => Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')),
+    []
   );
 
-  const periods = ['AM', 'PM'];
+  const periods = React.useMemo(() => ['AM', 'PM'], []);
 
   // Calculate disabled hours, minutes, and periods based on minDateTime
   const { disabledHours, disabledMinutes, disabledPeriods } = React.useMemo(() => {

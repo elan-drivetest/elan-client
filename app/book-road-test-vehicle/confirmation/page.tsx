@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/context/BookingContext";
 import BookingStepsProgress from "@/components/booking/BookingStepsProgress";
 import TestSummary from "@/components/booking/TestSummary";
@@ -15,11 +16,12 @@ const bookingSteps = [
 ];
 
 export default function Confirmation() {
+  const router = useRouter();
   const { bookingState, setCurrentStep, calculatePricing } = useBooking();
-  
+
   // Use ref to prevent infinite re-renders
   const hasInitialized = useRef(false);
-  
+
   useEffect(() => {
     if (!hasInitialized.current) {
       setCurrentStep(4); // Still at step 4 but completed
@@ -29,6 +31,21 @@ export default function Confirmation() {
       hasInitialized.current = true;
     }
   }, [calculatePricing, setCurrentStep]); // Empty dependency array to prevent infinite loops
+
+  // Guard the browser Back button: the booking is already submitted/paid, so
+  // navigating back into the flow would let it be re-submitted. We push an
+  // extra history entry on mount; pressing Back triggers popstate, which we
+  // intercept and send the user to their dashboard instead of the payment step.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    window.history.pushState(null, "", window.location.href);
+    const handlePopState = () => {
+      router.replace("/dashboard");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [router]);
   
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleApplyPromo = (code: string) => {
@@ -42,7 +59,7 @@ export default function Confirmation() {
   
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <BookingStepsProgress steps={bookingSteps} />
+      <BookingStepsProgress steps={bookingSteps} disableNavigation />
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="col-span-1 md:col-span-1">

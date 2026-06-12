@@ -1,14 +1,14 @@
 // components/layout/Navbar.tsx
 "use client"
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { locations } from "@/lib/data/locations";
 import LocationsDropdown from "./LocationsDropdown";
 import { useAuth } from "@/lib/context/AuthContext";
-import { ChevronDown, User, LogOut, LayoutDashboard } from "lucide-react";
+import { ChevronDown, User, LogOut, LayoutDashboard, Sparkles, ArrowRight, Menu, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +20,28 @@ import {
 const Navbar = () => {
   const { user, isAuthenticated, logout, isLoading } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  console.log(user)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
+  // Publish the navbar's (variable) height as a CSS variable so other sticky
+  // elements — e.g. the dashboard sidebar — can offset themselves below it
+  // regardless of the announcement banner wrapping at different widths.
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+
+    const setHeight = () => {
+      document.documentElement.style.setProperty('--navbar-height', `${el.offsetHeight}px`);
+    };
+
+    setHeight();
+    const observer = new ResizeObserver(setHeight);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
@@ -143,14 +164,27 @@ const Navbar = () => {
   };
 
   return (
-    <div className="w-full border-b sticky top-0 bg-white z-50">
+    <div ref={navRef} className="w-full border-b sticky top-0 bg-white z-50">
       {/* Announcement banner */}
-      <div className="w-full bg-[#0C8B44] text-white text-center py-2 text-sm">
-        Get a $50 coupon with your first test ride book. Offer ends March 13, 2025. 
-        <Link href="/march-ride" className="underline ml-1">
-          Book your March ride now!
-        </Link>
-      </div>
+      <Link
+        href="/book-road-test-vehicle/road-test-details"
+        className="block w-full bg-[#0C8B44] text-white py-2 text-sm hover:bg-[#0C8B44]/90 transition-colors"
+      >
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-center gap-x-2 gap-y-1 flex-wrap text-center">
+          <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            <span className="font-semibold">Free 1-hour driving lesson</span>
+            <span className="opacity-90"> on pickups 100&nbsp;km+</span>
+            <span className="mx-2 opacity-60">•</span>
+            <span className="font-semibold">Free drop-off</span>
+            <span className="opacity-90"> at 50&nbsp;km+</span>
+          </span>
+          <span className="inline-flex items-center gap-1 underline underline-offset-2">
+            Book now
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+        </div>
+      </Link>
       
       {/* Main navbar */}
       <div className="w-full px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
@@ -184,9 +218,63 @@ const Navbar = () => {
           </Link>
         </div>
         
-        {/* Dynamic Auth Section */}
-        {renderAuthButtons()}
+        {/* Dynamic Auth Section + mobile menu toggle */}
+        <div className="flex items-center gap-2">
+          {renderAuthButtons()}
+
+          {/* Hamburger (mobile only) */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
+            className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
       </div>
+
+      {/* Mobile menu panel */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t bg-white px-4 py-3 space-y-1">
+          <Link
+            href="/how-it-works"
+            onClick={closeMobileMenu}
+            className="block px-2 py-2.5 text-base font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
+          >
+            How It Works
+          </Link>
+          <Link
+            href="/locations"
+            onClick={closeMobileMenu}
+            className="block px-2 py-2.5 text-base font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
+          >
+            Our Locations
+          </Link>
+          <Link
+            href="/contact-us"
+            onClick={closeMobileMenu}
+            className="block px-2 py-2.5 text-base font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
+          >
+            Contact Us
+          </Link>
+          <Link
+            href="/faq"
+            onClick={closeMobileMenu}
+            className="block px-2 py-2.5 text-base font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
+          >
+            FAQ
+          </Link>
+          <Link
+            href="https://blog.elanroadtestrental.ca/"
+            onClick={closeMobileMenu}
+            className="block px-2 py-2.5 text-base font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
+          >
+            Blogs
+          </Link>
+        </div>
+      )}
     </div>
   );
 };

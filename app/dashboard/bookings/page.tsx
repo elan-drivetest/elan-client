@@ -128,7 +128,7 @@ const RefundRequestModal: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
@@ -397,9 +397,9 @@ const BookingCard: React.FC<{
   const pickupInfo = getPickupDisplay();
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+    <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 space-y-6">
       {/* Header with booking info */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-xl font-semibold text-gray-900">
             {getTestTypeDisplay()} Road Test
@@ -694,9 +694,9 @@ const BookingCard: React.FC<{
       )}
 
       {/* Instructor information */}
-      <div className="bg-gray-50 p-4 rounded-lg flex items-center justify-between">
+      <div className="bg-gray-50 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="relative size-18 rounded-full overflow-hidden bg-gray-200">
+          <div className="relative size-18 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
             {hasInstructor ? (
               <Image
                 src="/instructor.png"
@@ -961,9 +961,9 @@ export default function Bookings() {
   // Show loading state during auth check or initial load
   if (authLoading || (!user && !hasCheckedAuth)) {
     return (
-      <div className="flex min-h-screen bg-white">
+      <div className="flex flex-col md:flex-row min-h-screen bg-white">
         <DashboardSidebar />
-        <div className="flex-1 p-8 flex items-center justify-center">
+        <div className="flex-1 p-4 sm:p-6 md:p-8 flex items-center justify-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#0C8B44]"></div>
         </div>
       </div>
@@ -973,9 +973,9 @@ export default function Bookings() {
   // Show login prompt if not authenticated
   if (hasCheckedAuth && !isAuthenticated) {
     return (
-      <div className="flex min-h-screen bg-white">
+      <div className="flex flex-col md:flex-row min-h-screen bg-white">
         <DashboardSidebar />
-        <div className="flex-1 p-8 flex items-center justify-center">
+        <div className="flex-1 p-4 sm:p-6 md:p-8 flex items-center justify-center">
           <div className="text-center">
             <div className="text-xl font-semibold text-gray-600 mb-4">Authentication Required</div>
             <div className="text-gray-500 mb-6">Please log in to access your bookings.</div>
@@ -992,12 +992,12 @@ export default function Bookings() {
   }
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex flex-col md:flex-row min-h-screen bg-white">
       {/* Sidebar */}
       <DashboardSidebar />
       
       {/* Main content */}
-      <div className="flex-1 p-8 max-w-4xl">
+      <div className="flex-1 p-4 sm:p-6 md:p-8 max-w-6xl mx-auto w-full">
         <h1 className="text-2xl font-bold mb-6">Your Bookings</h1>
         
         {/* Tabs */}

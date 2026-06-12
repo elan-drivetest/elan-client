@@ -11,7 +11,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (user: UserProfile) => void;
   logout: () => Promise<void>;
-  checkAuthStatus: () => Promise<void>;
+  checkAuthStatus: () => Promise<UserProfile | null>;
   refreshAuth: () => Promise<boolean>;
 }
 
@@ -21,15 +21,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(false); // Changed: start as false, not true
 
-  // Check if user is authenticated by calling the API
-  const checkAuthStatus = async () => {
+  // Check if user is authenticated by calling the API.
+  // Returns the authoritative profile (or null) so callers can use the
+  // freshly fetched data without waiting for the `user` state to settle.
+  const checkAuthStatus = async (): Promise<UserProfile | null> => {
     console.log('🔍 Checking authentication status...');
     setIsLoading(true);
-    
+
     try {
       // Call the API to get current user
       const result = await authApi.getCurrentUser();
-      
+
       if (result.success && result.data) {
         console.log('✅ User authenticated:', {
           id: result.data.id,
@@ -37,13 +39,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: result.data.full_name
         });
         setUser(result.data);
+        return result.data;
       } else {
         console.log('❌ User not authenticated');
         setUser(null);
+        return null;
       }
     } catch (error) {
       console.error('💥 Auth check failed:', error);
       setUser(null);
+      return null;
     } finally {
       setIsLoading(false);
     }

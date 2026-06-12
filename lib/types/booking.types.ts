@@ -104,8 +104,9 @@ export interface DriveTestCenter extends BaseEntity {
   lat: number;
   lng: number;
   base_price: number; // in cents
-  status: DriveTestCenterStatus;
-  
+  // Omitted by the public GET /drive-test-centers (admin-only serialization group)
+  status?: DriveTestCenterStatus;
+
   // Only address is optional - will be added later to API
   address?: string;
 }

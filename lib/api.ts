@@ -46,12 +46,6 @@ const processQueue = (error: unknown = null) => {
   failedQueue = [];
 };
 
-// Helper to check if refresh token cookie exists
-const hasRefreshToken = (): boolean => {
-  if (typeof document === 'undefined') return false;
-  return document.cookie.includes('_elanAuthR=');
-};
-
 // Request interceptor for debugging and cookie handling
 api.interceptors.request.use(
   (config) => {
@@ -109,11 +103,12 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // Don't attempt refresh if no refresh token exists
-      if (!hasRefreshToken()) {
-        console.log('🚫 No refresh token available - user is unauthenticated');
-        return Promise.reject(error);
-      }
+      // NOTE: We intentionally do NOT pre-check for a refresh-token cookie here.
+      // The refresh token (_elanAuthR) is set by the API domain and/or is
+      // HttpOnly, so it is invisible to document.cookie on the frontend — any
+      // such check would always report "missing" and wrongly skip the refresh.
+      // Instead we always attempt the refresh; the backend is the source of
+      // truth and returns 401 if there is genuinely no valid refresh token.
 
       // If we're already refreshing, queue this request
       if (isRefreshing) {
