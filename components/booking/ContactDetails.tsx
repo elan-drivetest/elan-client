@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { formatCanadianPhoneDisplay } from "@/lib/utils/phone.utils";
 
 interface ContactDetailsProps {
   fullName: string;
@@ -22,7 +23,7 @@ export default function ContactDetails({
       <div className="text-sm text-gray-600">
         <p>{fullName}</p>
         <p>{email}</p>
-        <p>{phone}</p>
+        <p>{formatCanadianPhoneDisplay(phone)}</p>
       </div>
     </div>
   );

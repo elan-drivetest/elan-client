@@ -5,6 +5,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { FormInput } from "@/components/ui/form-input";
 import { Separator } from "@/components/ui/separator";
+import PhoneInput from "@/components/shared/PhoneInput";
+import { isValidCanadianPhone, toE164Canadian } from "@/lib/utils/phone.utils";
 import { authApi, handleApiError, validateRegistrationData } from "@/lib/api";
 import type { RegisterRequest } from "@/lib/types/auth.types";
 
@@ -47,8 +49,7 @@ export default function SignupPage() {
         return emailRegex.test(value) ? "" : "Please enter a valid email";
       case "phone":
         if (!value.trim()) return ""; // Optional field
-        const phoneRegex = /^\+?[\d\s\-()]+$/;
-        return phoneRegex.test(value) ? "" : "Please enter a valid phone number";
+        return isValidCanadianPhone(value) ? "" : "Please enter a valid Canadian phone number";
       case "full_name":
         return value.trim().length > 0 ? "" : "Please enter your full name";
       case "password":
@@ -128,7 +129,7 @@ export default function SignupPage() {
       full_name: formData.full_name,
       email: formData.email,
       password: formData.password,
-      phone_number: typeof formData.phone === 'string' ? formData.phone.trim() : undefined,
+      phone_number: toE164Canadian(typeof formData.phone === 'string' ? formData.phone : '') || undefined,
       confirmPassword: "",
       phone: undefined,
       marketing: undefined
@@ -277,18 +278,15 @@ export default function SignupPage() {
           />
           
           {/* Phone Number */}
-          <FormInput
+          <PhoneInput
             label="Phone Number"
             id="phone"
             name="phone"
-            type="tel"
-            placeholder="Phone Number"
             value={formData.phone as string}
             onChange={handleChange}
             onBlur={handleBlur}
             error={errors.phone}
             showError={touched.phone && !!errors.phone}
-            leftIcon={<span className="text-gray-500 sm:text-sm">🇨🇦</span>}
           />
           
           {/* Full Name */}

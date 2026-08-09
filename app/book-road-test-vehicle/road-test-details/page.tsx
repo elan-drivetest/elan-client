@@ -9,6 +9,7 @@ import { useBooking } from "@/lib/context/BookingContext";
 import { TimePicker } from "@/components/ui/time-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import BookingStepsProgress from "@/components/booking/BookingStepsProgress";
+import HintTooltip from "@/components/shared/HintTooltip";
 import type { DriveTestCenter, TestType } from "@/lib/types/booking.types";
 import { Loader2, AlertCircle } from "lucide-react";
 
@@ -282,8 +283,9 @@ export default function RoadTestDetails() {
         <p className="font-black mb-2 text-lg">Select Road Test Date & Time</p>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-black text-gray-600 mb-1">
+            <label className="text-sm font-black text-gray-600 mb-1 flex items-center gap-1.5">
               Road Test Date
+              <HintTooltip text="Must be at least 48 hours from now. Earlier dates are grayed out." />
             </label>
             <DatePicker
               date={selectedDate}
@@ -296,17 +298,12 @@ export default function RoadTestDetails() {
                 Please select a test center first
               </p>
             )}
-            {selectedCenter && (
-              <p className="text-xs text-amber-600 mt-1.5 flex items-start gap-1">
-                <span className="text-amber-500 mt-0.5">⚠️</span>
-                <span>Must be at least 48 hours from now. Earlier dates are grayed out.</span>
-              </p>
-            )}
           </div>
           
           <div>
-            <label className="block text-sm font-black text-gray-600 mb-1">
+            <label className="text-sm font-black text-gray-600 mb-1 flex items-center gap-1.5">
               Road Test Time
+              <HintTooltip text="Time must be at least 48 hours from now. Earlier times are disabled." />
             </label>
             <TimePicker
               date={selectedDate}
@@ -317,12 +314,6 @@ export default function RoadTestDetails() {
             {(!selectedCenter || !bookingState.testDate) && (
               <p className="text-sm text-gray-500 mt-1">
                 Please select a test center and date first
-              </p>
-            )}
-            {selectedCenter && bookingState.testDate && (
-              <p className="text-xs text-amber-600 mt-1.5 flex items-start gap-1">
-                <span className="text-amber-500 mt-0.5">⚠️</span>
-                <span>Time must be at least 48 hours from now. Earlier times are disabled.</span>
               </p>
             )}
           </div>

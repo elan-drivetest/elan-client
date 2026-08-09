@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import FormInput from "@/components/booking/FormInput";
 import Checkbox from "@/components/booking/Checkbox";
-// import { Flag } from "lucide-react";
+import PhoneInput from "@/components/shared/PhoneInput";
+import { formatCanadianPhone, isValidCanadianPhone } from "@/lib/utils/phone.utils";
 
 export interface SignupFormData {
   email: string;
@@ -32,7 +33,7 @@ export default function SignupForm({
 }: SignupFormProps) {
   const [formData, setFormData] = useState<SignupFormData>({
     email: initialValues.email || "",
-    phone: initialValues.phone || "",
+    phone: formatCanadianPhone(initialValues.phone || ""),
     fullName: initialValues.fullName || "",
     password: initialValues.password || "",
     confirmPassword: initialValues.confirmPassword || "",
@@ -55,8 +56,7 @@ export default function SignupForm({
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(value) ? "" : "Please enter a valid email";
       case "phone":
-        const phoneRegex = /^\d{10}$/;
-        return phoneRegex.test(value.replace(/\D/g, "")) ? "" : "Please enter a valid 10-digit phone number";
+        return isValidCanadianPhone(value) ? "" : "Please enter a valid Canadian phone number";
       case "fullName":
         return value.trim().length > 0 ? "" : "Please enter your full name";
       case "password":
@@ -159,22 +159,16 @@ export default function SignupForm({
         error={touched.email ? errors.email : undefined}
       />
 
-      <FormInput
+      <PhoneInput
         label="Phone Number"
         id="phone"
         name="phone"
-        type="tel"
-        placeholder="Phone Number"
         required
+        containerClassName="mb-4"
         value={formData.phone}
         onChange={handleChange}
         onBlur={handleBlur}
         error={touched.phone ? errors.phone : undefined}
-        leftIcon={
-          <div className="flex items-center">
-            <span className="text-sm text-gray-500">🇨🇦</span>
-          </div>
-        }
       />
 
       <FormInput

@@ -12,6 +12,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatCanadianPhoneDisplay, toE164Canadian } from "@/lib/utils/phone.utils";
 
 // Define the booking interface based on the /bookings/recent API response
 interface RecentBookingResponse {
@@ -230,9 +231,9 @@ const DashboardBookingCard: React.FC<{
               <>
                 <div className="font-medium">{booking.instructor_full_name}</div>
                   {hasInstructor && booking.instructor_phone_number && (
-                    <Link href={`tel:${booking.instructor_phone_number}`} className="flex items-center text-sm hover:text-[#0C8B44]">
+                    <Link href={`tel:${toE164Canadian(booking.instructor_phone_number) || booking.instructor_phone_number}`} className="flex items-center text-sm hover:text-[#0C8B44]">
                       <Phone size={16} className="mr-1" />
-                      {booking.instructor_phone_number}
+                      {formatCanadianPhoneDisplay(booking.instructor_phone_number)}
                     </Link>
                   )}
                 <div className="flex items-center gap-1 mt-1 mb-1">

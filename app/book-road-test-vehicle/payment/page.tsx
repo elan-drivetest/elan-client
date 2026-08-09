@@ -9,6 +9,7 @@ import BookingStepsProgress from "@/components/booking/BookingStepsProgress";
 import TestSummary from "@/components/booking/TestSummary";
 import PickupOptions from "@/components/booking/PickupOptions";
 import { CheckCircle, CreditCard, FileText, AlertTriangle, Loader2 } from "lucide-react";
+import { formatCanadianPhoneDisplay } from "@/lib/utils/phone.utils";
 
 const bookingSteps = [
   { id: 1, name: "Road Test Details", path: "/book-road-test-vehicle/road-test-details" },
@@ -285,7 +286,7 @@ export default function Payment() {
               <div className="text-sm">
                 <p>{bookingState.userDetails?.fullName || ""}</p>
                 <p>{bookingState.userDetails?.email || ""}</p>
-                <p>{bookingState.userDetails?.phone || ""}</p>
+                <p>{formatCanadianPhoneDisplay(bookingState.userDetails?.phone)}</p>
               </div>
             </div>
             <div>

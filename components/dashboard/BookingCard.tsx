@@ -4,6 +4,7 @@ import { CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { BookingCardProps } from "@/lib/types";
+import { formatCanadianPhoneDisplay, toE164Canadian } from "@/lib/utils/phone.utils";
 
 export default function BookingCard({ booking, instructor }: BookingCardProps) {
   return (
@@ -64,9 +65,9 @@ export default function BookingCard({ booking, instructor }: BookingCardProps) {
         </div>
         
         <div className="flex items-center gap-6">
-          <Link href={`tel:${instructor.phone}`} className="flex items-center text-sm hover:text-[#0C8B44]">
+          <Link href={`tel:${toE164Canadian(instructor.phone) || instructor.phone}`} className="flex items-center text-sm hover:text-[#0C8B44]">
             <Phone size={16} className="mr-1" />
-            {instructor.phone}
+            {formatCanadianPhoneDisplay(instructor.phone)}
           </Link>
           
           <div className="relative h-14 w-20">

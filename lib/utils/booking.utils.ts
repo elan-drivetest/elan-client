@@ -377,6 +377,24 @@ export const formatAddonDuration = (durationSeconds: number): string => {
   }
 };
 
+/**
+ * Whether the visitor has an in-progress booking saved by BookingContext.
+ * Reads localStorage directly so it can be used outside BookingProvider
+ * (e.g. on /login and /confirm-email) to send the user back into the flow
+ * instead of the dashboard. Safe on the server (returns false).
+ */
+export const hasBookingInProgress = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem('bookingState');
+    if (!raw) return false;
+    const state = JSON.parse(raw);
+    return !!(state?.testType && state?.testCenterId && state?.testDate);
+  } catch {
+    return false;
+  }
+};
+
 // ============================================================================
 // EXPORT ALL UTILITIES
 // ============================================================================

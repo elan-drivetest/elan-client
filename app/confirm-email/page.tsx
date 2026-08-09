@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/lib/context/AuthContext';
+import { hasBookingInProgress } from '@/lib/utils/booking.utils';
 
 function ConfirmEmailContent() {
   const router = useRouter();
@@ -45,6 +46,10 @@ function ConfirmEmailContent() {
         // Step 2: Get the current user data (backend should have set auth cookie)
         const userResult = await authApi.getCurrentUser();
 
+        // The saved booking (localStorage) decides where the user continues:
+        // back into the booking flow with their Step 1 values, or the dashboard.
+        const resumeBooking = hasBookingInProgress();
+
         if (userResult.success && userResult.data) {
           console.log('✅ User data retrieved:', userResult.data);
 
@@ -58,16 +63,20 @@ function ConfirmEmailContent() {
           setStatus('success');
 
           setTimeout(() => {
-            // Redirect to booking details page
-            router.push('/book-road-test-vehicle/booking-details');
+            router.push(resumeBooking ? '/book-road-test-vehicle/booking-details' : '/dashboard');
           }, 2000);
         } else {
-          // Email confirmed but couldn't get user data - still redirect to login
+          // Email confirmed but couldn't get user data (e.g. auth cookie not
+          // set) - send to login, telling it where to land after a successful
+          // login so an in-progress booking is resumed with its saved values.
           console.warn('⚠️ Email confirmed but could not retrieve user data');
           setStatus('success');
 
           setTimeout(() => {
-            router.push('/login?verified=true');
+            const loginUrl = resumeBooking
+              ? `/login?verified=true&redirect=${encodeURIComponent('/book-road-test-vehicle/booking-details')}`
+              : '/login?verified=true';
+            router.push(loginUrl);
           }, 2000);
         }
       } catch (error) {
@@ -121,7 +130,7 @@ function ConfirmEmailContent() {
               Your email has been confirmed. You are now signed in.
             </p>
             <p className="text-sm text-gray-500">
-              Redirecting you to complete your booking...
+              Redirecting you...
             </p>
           </div>
         )}

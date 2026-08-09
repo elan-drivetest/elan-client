@@ -1,18 +1,39 @@
 // app/login/page.tsx - Clean version
 "use client"
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormInput } from "@/components/ui/form-input";
 import { Separator } from "@/components/ui/separator";
 import { authApi, handleApiError } from "@/lib/api";
 import { useAuth } from "@/lib/context/AuthContext";
+import { hasBookingInProgress } from "@/lib/utils/booking.utils";
 import type { LoginRequest } from "@/lib/types/auth.types";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { checkAuthStatus } = useAuth();
+
+  // "verified=true" arrives from /confirm-email when the email was confirmed
+  // but auto-login didn't stick; "redirect" says where to land after login.
+  const emailJustVerified = searchParams.get('verified') === 'true';
+  const redirectParam = searchParams.get('redirect');
+
+  // Where to go after a successful login:
+  // 1. an internal redirect param (external/protocol-relative URLs rejected),
+  // 2. else back into an in-progress booking so saved Step 1 values are kept,
+  // 3. else the dashboard.
+  const getPostLoginDestination = (): string => {
+    if (redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')) {
+      return redirectParam;
+    }
+    if (hasBookingInProgress()) {
+      return '/book-road-test-vehicle/booking-details';
+    }
+    return '/dashboard';
+  };
   const [formData, setFormData] = useState<LoginRequest>({
     email: "",
     password: ""
@@ -89,10 +110,10 @@ export default function LoginPage() {
         console.log('Login successful, checking auth status...');
         // Let AuthContext fetch user data
         await checkAuthStatus();
-        // Redirect to dashboard. Keep isLoading=true so the button spinner
-        // stays visible through navigation instead of flickering back to
-        // "Log in" while the dashboard loads.
-        router.push("/dashboard");
+        // Keep isLoading=true so the button spinner stays visible through
+        // navigation instead of flickering back to "Log in" while the
+        // destination page loads.
+        router.push(getPostLoginDestination());
         return;
       }
 
@@ -123,6 +144,15 @@ export default function LoginPage() {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {emailJustVerified && (
+            <div className="bg-green-50 border border-green-200 rounded-md p-4">
+              <p className="text-sm text-green-700">
+                Your email has been verified! Log in to continue
+                {redirectParam ? " your booking" : ""}.
+              </p>
+            </div>
+          )}
+
           {errors.general && (
             <div className="bg-red-50 border border-red-200 rounded-md p-4">
               <p className="text-sm text-red-600">{errors.general}</p>
@@ -189,5 +219,20 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  // useSearchParams requires a Suspense boundary during prerendering
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0C8B44]"></div>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }

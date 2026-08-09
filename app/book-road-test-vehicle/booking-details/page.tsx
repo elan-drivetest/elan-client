@@ -11,6 +11,7 @@ import PickupOptions from "@/components/booking/PickupOptions";
 import { useBooking } from "@/lib/context/BookingContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { authApi, handleApiError } from "@/lib/api";
+import { toE164Canadian, formatCanadianPhoneDisplay } from "@/lib/utils/phone.utils";
 import type { RegisterRequest, LoginRequest } from "@/lib/types/auth.types";
 import { CheckCircle, LayoutDashboard } from "lucide-react";
 
@@ -101,7 +102,7 @@ export default function BookingDetails() {
         full_name: data.fullName,
         email: data.email,
         password: data.password,
-        phone_number: data.phone || undefined,
+        phone_number: toE164Canadian(data.phone) || undefined,
         confirmPassword: "", // Not used by API but required by type
         phone: undefined,    // Not used by API but required by type
         marketing: undefined // Not used by API but required by type
@@ -261,7 +262,7 @@ export default function BookingDetails() {
                     <p><strong>Name:</strong> {userDetails?.fullName || user?.full_name || 'N/A'}</p>
                     <p><strong>Email:</strong> {userDetails?.email || user?.email || 'N/A'}</p>
                     {(userDetails?.phone || user?.phone_number) && (
-                      <p><strong>Phone:</strong> {userDetails?.phone || user?.phone_number}</p>
+                      <p><strong>Phone:</strong> {formatCanadianPhoneDisplay(userDetails?.phone || user?.phone_number)}</p>
                     )}
                   </div>
                 </div>

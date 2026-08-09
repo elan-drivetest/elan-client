@@ -19,48 +19,58 @@ export function FormInput({
   showError = false,
   className,
   leftIcon,
+  value,
+  defaultValue,
+  onChange,
+  onBlur,
   ...props
 }: FormInputProps) {
-  const [value, setValue] = useState(props.defaultValue || "");
+  // Controlled when a `value` prop is given; otherwise fall back to
+  // internal state seeded from `defaultValue`.
+  const isControlled = value !== undefined;
+  const [internalValue, setInternalValue] = useState(defaultValue ?? "");
   const [touched, setTouched] = useState(false);
-  const displayError = showError || (touched && error);
-  
+  const displayError = showError || (touched && !!error);
+
   return (
     <div className="w-full">
       <label htmlFor={id} className="block text-sm text-gray-600 mb-1">
         {label}
       </label>
-      
-      <div className={cn("relative", leftIcon ? "flex rounded-md shadow-sm" : "")}>
+
+      <div className={cn(leftIcon ? "flex" : "relative")}>
         {leftIcon && (
-          <span className="inline-flex items-center px-3 py-2 border border-r-0 border-gray-300 bg-gray-50 rounded-l-md">
+          <span className="inline-flex items-center px-3 border border-r-0 border-gray-300 bg-gray-50 rounded-l-md text-sm text-gray-500">
             {leftIcon}
           </span>
         )}
-        
+
         <input
           id={id}
-          {...props}
-          value={value as string}
+          value={isControlled ? value : internalValue}
           onChange={(e) => {
-            setValue(e.target.value);
-            props.onChange?.(e);
+            if (!isControlled) setInternalValue(e.target.value);
+            onChange?.(e);
           }}
           onBlur={(e) => {
             setTouched(true);
-            props.onBlur?.(e);
+            onBlur?.(e);
           }}
           className={cn(
-            "block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-[#0C8B44] focus:border-[#0C8B44]",
+            "w-full px-3 py-2 text-sm border border-gray-300 bg-white shadow-sm",
+            "placeholder:text-gray-400",
+            "focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent",
+            "disabled:bg-gray-50 disabled:cursor-not-allowed",
             leftIcon ? "rounded-r-md" : "rounded-md",
-            displayError ? "border-red-500" : "",
+            displayError && "border-red-500 focus:ring-red-500",
             className
           )}
+          {...props}
         />
       </div>
-      
-      {displayError && (
-        <p className="text-red-500 text-xs mt-1">{error}</p>
+
+      {displayError && error && (
+        <p className="mt-1 text-xs text-red-500">{error}</p>
       )}
     </div>
   );

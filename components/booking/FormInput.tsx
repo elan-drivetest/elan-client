@@ -33,9 +33,12 @@ const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
             id={id}
             ref={ref}
             className={cn(
-              "w-full border border-gray-300 rounded-md p-2 text-sm",
+              "w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white shadow-sm",
+              "placeholder:text-gray-400",
+              "focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent",
+              "disabled:bg-gray-50 disabled:cursor-not-allowed",
               leftIcon && "pl-10",
-              error && "border-red-500",
+              error && "border-red-500 focus:ring-red-500",
               className
             )}
             {...props}

@@ -7,6 +7,7 @@ import { Check, Phone, Loader2, Clock, AlertCircle, Calendar, MapPin, X, DollarS
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatCanadianPhoneDisplay, toE164Canadian } from "@/lib/utils/phone.utils";
 import HelpCard from "@/components/booking/HelpCard";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -493,7 +494,7 @@ const BookingCard: React.FC<{
                 <div className="text-sm text-gray-600">Name: {booking.full_name}</div>
               )}
               {booking.phone_number && (
-                <div className="text-sm text-gray-600">Phone: {booking.phone_number}</div>
+                <div className="text-sm text-gray-600">Phone: {formatCanadianPhoneDisplay(booking.phone_number)}</div>
               )}
               {booking.user_id && (
                 <div className="text-xs text-gray-500">User ID: {booking.user_id}</div>
@@ -720,9 +721,9 @@ const BookingCard: React.FC<{
               <>
                 <div className="font-medium">{booking.instructor_full_name}</div>
                 {booking.instructor_phone_number && (
-                  <a href={`tel:${booking.instructor_phone_number}`} className="flex items-center text-sm hover:text-[#0C8B44] transition-colors">
+                  <a href={`tel:${toE164Canadian(booking.instructor_phone_number) || booking.instructor_phone_number}`} className="flex items-center text-sm hover:text-[#0C8B44] transition-colors">
                     <Phone size={16} className="mr-1" />
-                    {booking.instructor_phone_number}
+                    {formatCanadianPhoneDisplay(booking.instructor_phone_number)}
                   </a>
                 )}
                 <div className="flex items-center gap-1 mt-1 mb-1">

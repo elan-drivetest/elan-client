@@ -88,11 +88,15 @@ api.interceptors.response.use(
       if (isLoginEndpoint || isRefreshEndpoint || isRegisterEndpoint || isConfirmEndpoint || originalRequest._retry) {
         console.log('🚫 401 on auth endpoint or already retried - not refreshing');
 
-        // Don't redirect if on booking pages (they handle auth themselves)
-        const isOnBookingPage = typeof window !== 'undefined' && window.location.pathname.includes('/book-road-test-vehicle');
+        // Don't redirect if on pages that handle auth themselves
+        // (booking flow handles auth in Step 2; /confirm-email decides its own
+        // fallback destination and must not be hijacked mid-verification)
+        const isOnSelfManagedAuthPage = typeof window !== 'undefined' &&
+          (window.location.pathname.includes('/book-road-test-vehicle') ||
+            window.location.pathname.includes('/confirm-email'));
 
-        // Only redirect if not on a public auth page or booking page
-        if (!isLoginEndpoint && !isRegisterEndpoint && !isConfirmEndpoint && !isOnBookingPage && typeof window !== 'undefined') {
+        // Only redirect if not on a public auth page or self-managed page
+        if (!isLoginEndpoint && !isRegisterEndpoint && !isConfirmEndpoint && !isOnSelfManagedAuthPage && typeof window !== 'undefined') {
           console.log('🚨 Redirecting to login due to auth failure');
           // Clear cookies
           document.cookie = '_elanAuth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
@@ -148,11 +152,14 @@ api.interceptors.response.use(
         processQueue(refreshError);
         isRefreshing = false;
 
-        // Don't redirect if on booking pages (they handle auth themselves)
-        const isOnBookingPage = typeof window !== 'undefined' && window.location.pathname.includes('/book-road-test-vehicle');
+        // Don't redirect if on pages that handle auth themselves
+        // (booking flow and /confirm-email decide their own destinations)
+        const isOnSelfManagedAuthPage = typeof window !== 'undefined' &&
+          (window.location.pathname.includes('/book-road-test-vehicle') ||
+            window.location.pathname.includes('/confirm-email'));
 
-        // Clear cookies and redirect to login (only if not on booking page)
-        if (typeof window !== 'undefined' && !isOnBookingPage) {
+        // Clear cookies and redirect to login (only if not on a self-managed page)
+        if (typeof window !== 'undefined' && !isOnSelfManagedAuthPage) {
           console.log('🚨 Redirecting to login after failed refresh');
           document.cookie = '_elanAuth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
           document.cookie = '_elanAuthR=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;

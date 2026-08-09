@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/context/AuthContext";
 import { authApi, handleApiError } from "@/lib/api";
+import PhoneInput from "@/components/shared/PhoneInput";
+import { formatCanadianPhone, toE164Canadian } from "@/lib/utils/phone.utils";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
 import { fileUploadService } from "@/lib/services/fileUpload.service";
 import type { UpdateProfileRequest } from "@/lib/types/auth.types";
@@ -53,7 +55,7 @@ export default function Profile() {
       setProfileForm({
         full_name: user.full_name || "",
         email: user.email || "",
-        phone_number: user.phone_number || "",
+        phone_number: formatCanadianPhone(user.phone_number || ""),
         address: user.address || ""
       });
     }
@@ -208,8 +210,13 @@ export default function Profile() {
         updateData.full_name = profileForm.full_name;
       }
       
-      if (profileForm.phone_number !== user?.phone_number) {
-        updateData.phone_number = profileForm.phone_number;
+      const normalizedPhone = toE164Canadian(profileForm.phone_number);
+      if (profileForm.phone_number.trim() && !normalizedPhone) {
+        setProfileError("Please enter a valid Canadian phone number");
+        return;
+      }
+      if (normalizedPhone !== (user?.phone_number || "")) {
+        updateData.phone_number = normalizedPhone;
       }
       
       if (profileForm.address !== user?.address) {
@@ -490,7 +497,7 @@ export default function Profile() {
                     type="text"
                     id="full_name"
                     name="full_name"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                     value={profileForm.full_name}
                     onChange={handleProfileChange}
                     required
@@ -509,7 +516,7 @@ export default function Profile() {
                     type="email"
                     id="email"
                     name="email"
-                    className="w-full p-3 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-gray-50 shadow-sm cursor-not-allowed"
                     value={profileForm.email}
                     readOnly
                     title="Email cannot be changed"
@@ -527,14 +534,11 @@ export default function Profile() {
                       Phone Number
                     </div>
                   </label>
-                  <input
-                    type="tel"
+                  <PhoneInput
                     id="phone_number"
                     name="phone_number"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent"
                     value={profileForm.phone_number}
                     onChange={handleProfileChange}
-                    placeholder="Enter your phone number"
                     disabled={!isAuthenticated}
                   />
                 </div>
@@ -550,7 +554,7 @@ export default function Profile() {
                     type="text"
                     id="address"
                     name="address"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                     value={profileForm.address}
                     onChange={handleProfileChange}
                     placeholder="Enter your address"
@@ -600,7 +604,7 @@ export default function Profile() {
                     type="password"
                     id="currentPassword"
                     name="currentPassword"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                     placeholder="••••••••"
                     value={passwordForm.currentPassword}
                     onChange={handlePasswordChange}
@@ -620,7 +624,7 @@ export default function Profile() {
                     type="password"
                     id="newPassword"
                     name="newPassword"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                     placeholder="••••••••"
                     value={passwordForm.newPassword}
                     onChange={handlePasswordChange}
@@ -642,7 +646,7 @@ export default function Profile() {
                     type="password"
                     id="confirmPassword"
                     name="confirmPassword"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                     placeholder="••••••••"
                     value={passwordForm.confirmPassword}
                     onChange={handlePasswordChange}
