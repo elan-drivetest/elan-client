@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { bookingApi } from '@/lib/api';
 import { bookingUtils } from '@/lib/utils/booking.utils';
+import { getFriendlyErrorMessage } from '@/lib/utils/error-messages';
 import type {
   ApiResponse,
   DriveTestCenter,
@@ -50,7 +51,7 @@ export const useDriveTestCenters = (enabled: boolean = true) => {
           console.log('🏢 Test centers require authentication - will load after login');
           setCenters([]); // Set empty array instead of error
         } else {
-          setError(response.error?.message || 'Failed to fetch test centers');
+          setError(getFriendlyErrorMessage(response.error, 'Failed to load test centers. Please try again.'));
         }
       }
     } catch (err) {
@@ -117,7 +118,7 @@ export const useAddons = (testType?: TestType, enabled: boolean = true) => {
           console.log('📋 Add-ons require authentication - will load after login');
           setAddons([]); // Set empty array instead of error
         } else {
-          setError(response.error?.message || 'Failed to fetch addons');
+          setError(getFriendlyErrorMessage(response.error, 'Failed to load add-ons. Please try again.'));
         }
       }
     } catch (err) {
@@ -183,7 +184,7 @@ export const useCouponVerification = () => {
         // FIXED: Return the actual coupon data
         return response.data;
       } else {
-        setError(response.error?.message || 'Invalid coupon code');
+        setError(getFriendlyErrorMessage(response.error, "That coupon code isn't valid. Please check it and try again."));
         return null;
       }
     } catch (err) {
@@ -244,7 +245,7 @@ export const useAddressSearch = () => {
         setResults(response.data);
         return response.data;
       } else {
-        setError(response.error?.message || 'Failed to search addresses');
+        setError(getFriendlyErrorMessage(response.error, 'Address search failed. Please try again.'));
         setResults([]);
         return [];
       }
@@ -291,7 +292,7 @@ export const useBookings = () => {
       if (response.success && response.data) {
         setBookings(response.data);
       } else {
-        setError(response.error?.message || 'Failed to fetch bookings');
+        setError(getFriendlyErrorMessage(response.error, 'Failed to load your bookings. Please try again.'));
       }
     } catch (err) {
       setError('Network error occurred while fetching bookings');
@@ -310,7 +311,7 @@ export const useBookings = () => {
       if (response.success) {
         setRecentBooking(response.data || null);
       } else {
-        setError(response.error?.message || 'Failed to fetch recent booking');
+        setError(getFriendlyErrorMessage(response.error, 'Failed to load your recent booking. Please try again.'));
       }
     } catch (err) {
       setError('Network error occurred while fetching recent booking');
@@ -381,7 +382,7 @@ export const useBookingCreation = () => {
         setCreatedBooking(response.data);
         return response;
       } else {
-        setError(response.error?.message || 'Failed to create booking');
+        setError(getFriendlyErrorMessage(response.error, "We couldn't create your booking. Please try again."));
         return response;
       }
     } catch (err) {
@@ -530,7 +531,7 @@ export const useRefundRequest = () => {
         setRefundRequest(response.data);
         return response;
       } else {
-        setError(response.error?.message || 'Failed to create refund request');
+        setError(getFriendlyErrorMessage(response.error, "We couldn't submit your refund request. Please try again."));
         return response;
       }
     } catch (err) {
@@ -584,7 +585,7 @@ export const useRefundRequests = (params?: RefundRequestQueryParams) => {
       if (response.success && response.data) {
         setRefundRequests(response.data);
       } else {
-        setError(response.error?.message || 'Failed to fetch refund requests');
+        setError(getFriendlyErrorMessage(response.error, 'Failed to load refund requests. Please try again.'));
       }
     } catch (err) {
       setError('Network error occurred while fetching refund requests');

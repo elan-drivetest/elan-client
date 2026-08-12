@@ -5,6 +5,7 @@ import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormInput } from "@/components/ui/form-input";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { Separator } from "@/components/ui/separator";
 import { authApi, handleApiError } from "@/lib/api";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -153,11 +154,7 @@ function LoginContent() {
             </div>
           )}
 
-          {errors.general && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <p className="text-sm text-red-600">{errors.general}</p>
-            </div>
-          )}
+          <ErrorAlert message={errors.general} />
           
           <FormInput
             label="Email"

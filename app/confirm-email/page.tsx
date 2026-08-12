@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/lib/context/AuthContext';
 import { hasBookingInProgress } from '@/lib/utils/booking.utils';
+import { getFriendlyErrorMessage } from '@/lib/utils/error-messages';
 
 function ConfirmEmailContent() {
   const router = useRouter();
@@ -35,8 +36,10 @@ function ConfirmEmailContent() {
           console.error('❌ Email confirmation failed:', confirmResult.error);
           setStatus('error');
           setErrorMessage(
-            confirmResult.error?.message ||
-            'Failed to verify your email. The link may be expired or invalid.'
+            getFriendlyErrorMessage(
+              confirmResult.error,
+              'Failed to verify your email. The link may be expired or invalid.'
+            )
           );
           return;
         }

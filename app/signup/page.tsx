@@ -4,6 +4,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { FormInput } from "@/components/ui/form-input";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { Separator } from "@/components/ui/separator";
 import PhoneInput from "@/components/shared/PhoneInput";
 import { isValidCanadianPhone, toE164Canadian } from "@/lib/utils/phone.utils";
@@ -256,11 +257,7 @@ export default function SignupPage() {
         
         <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
           {/* General error message */}
-          {errors.general && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <p className="text-sm text-red-600">{errors.general}</p>
-            </div>
-          )}
+          <ErrorAlert message={errors.general} />
           
           {/* Email */}
           <FormInput

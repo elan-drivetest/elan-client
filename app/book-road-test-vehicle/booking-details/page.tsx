@@ -14,6 +14,7 @@ import { authApi, handleApiError } from "@/lib/api";
 import { toE164Canadian, formatCanadianPhoneDisplay } from "@/lib/utils/phone.utils";
 import type { RegisterRequest, LoginRequest } from "@/lib/types/auth.types";
 import { CheckCircle, LayoutDashboard } from "lucide-react";
+import { ErrorAlert } from "@/components/ui/error-alert";
 
 const bookingSteps = [
   { id: 1, name: "Road Test Details", path: "/book-road-test-vehicle/road-test-details" },
@@ -310,11 +311,7 @@ export default function BookingDetails() {
           <p className="text-gray-600 mb-6">{showLogin ? "Log in" : "Sign up"} to continue</p>
 
           {/* Show general errors */}
-          {errors.general && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-700">{errors.general}</p>
-            </div>
-          )}
+          <ErrorAlert message={errors.general} className="mb-4" />
 
           {/* Show email verification notice after signup */}
           {showEmailVerificationNotice && (

@@ -8,6 +8,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatCanadianPhoneDisplay, toE164Canadian } from "@/lib/utils/phone.utils";
+import { getFriendlyErrorMessage } from "@/lib/utils/error-messages";
 import HelpCard from "@/components/booking/HelpCard";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -117,7 +118,7 @@ const RefundRequestModal: React.FC<{
         onClose();
         setRefundReason('');
       } else {
-        alert(`Failed to submit refund request: ${response.error?.message || 'Unknown error'}`);
+        alert(getFriendlyErrorMessage(response.error, "We couldn't submit your refund request. Please try again."));
       }
     } catch {
       alert('An error occurred while submitting your refund request. Please try again.');
@@ -910,7 +911,7 @@ export default function Bookings() {
         // Fetch refund requests after bookings are loaded
         await fetchRefundRequests();
       } else {
-        setError(response.error?.message || 'Failed to fetch bookings');
+        setError(getFriendlyErrorMessage(response.error, 'Failed to load your bookings. Please try again.'));
       }
     } catch (err) {
       console.error('Error fetching bookings:', err);

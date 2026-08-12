@@ -2,9 +2,10 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react";
-import { User, Mail, Phone, MapPin, Lock, Camera } from "lucide-react";
+import { User, Mail, Phone, MapPin, Lock, Camera, Eye, EyeOff } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Button } from "@/components/ui/button";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/context/AuthContext";
 import { authApi, handleApiError } from "@/lib/api";
@@ -40,6 +41,15 @@ export default function Profile() {
     newPassword: "",
     confirmPassword: ""
   });
+  const [showPasswords, setShowPasswords] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false
+  });
+
+  const togglePasswordVisibility = (field: keyof typeof showPasswords) => {
+    setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
   
   // Loading and error states
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
@@ -428,11 +438,7 @@ export default function Profile() {
         </div>
 
         {/* Upload Error/Success Messages */}
-        {uploadError && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
-            <p className="text-sm text-red-600">{uploadError}</p>
-          </div>
-        )}
+        <ErrorAlert message={uploadError} className="mb-6" />
         
         {uploadSuccess && (
           <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-6">
@@ -479,11 +485,7 @@ export default function Profile() {
                 </div>
               )}
               
-              {profileError && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
-                  <p className="text-sm text-red-600">{profileError}</p>
-                </div>
-              )}
+              <ErrorAlert message={profileError} className="mb-6" />
 
               <div className="grid grid-cols-1 gap-6 mb-6">
                 <div>
@@ -586,11 +588,7 @@ export default function Profile() {
                 </div>
               )}
               
-              {passwordError && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
-                  <p className="text-sm text-red-600">{passwordError}</p>
-                </div>
-              )}
+              <ErrorAlert message={passwordError} className="mb-6" />
 
               <div className="grid grid-cols-1 gap-4 mb-6">
                 <div>
@@ -600,17 +598,28 @@ export default function Profile() {
                       Current Password
                     </div>
                   </label>
-                  <input
-                    type="password"
-                    id="currentPassword"
-                    name="currentPassword"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    placeholder="••••••••"
-                    value={passwordForm.currentPassword}
-                    onChange={handlePasswordChange}
-                    required
-                    disabled={!isAuthenticated}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPasswords.currentPassword ? "text" : "password"}
+                      id="currentPassword"
+                      name="currentPassword"
+                      className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      placeholder="••••••••"
+                      value={passwordForm.currentPassword}
+                      onChange={handlePasswordChange}
+                      required
+                      disabled={!isAuthenticated}
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => togglePasswordVisibility("currentPassword")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                      aria-label={showPasswords.currentPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPasswords.currentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
                 
                 <div>
@@ -620,18 +629,29 @@ export default function Profile() {
                       New Password
                     </div>
                   </label>
-                  <input
-                    type="password"
-                    id="newPassword"
-                    name="newPassword"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    placeholder="••••••••"
-                    value={passwordForm.newPassword}
-                    onChange={handlePasswordChange}
-                    minLength={8}
-                    required
-                    disabled={!isAuthenticated}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPasswords.newPassword ? "text" : "password"}
+                      id="newPassword"
+                      name="newPassword"
+                      className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      placeholder="••••••••"
+                      value={passwordForm.newPassword}
+                      onChange={handlePasswordChange}
+                      minLength={8}
+                      required
+                      disabled={!isAuthenticated}
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => togglePasswordVisibility("newPassword")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                      aria-label={showPasswords.newPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPasswords.newPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters</p>
                 </div>
                 
@@ -642,17 +662,28 @@ export default function Profile() {
                       Confirm New Password
                     </div>
                   </label>
-                  <input
-                    type="password"
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    placeholder="••••••••"
-                    value={passwordForm.confirmPassword}
-                    onChange={handlePasswordChange}
-                    required
-                    disabled={!isAuthenticated}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPasswords.confirmPassword ? "text" : "password"}
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-md bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0C8B44] focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      placeholder="••••••••"
+                      value={passwordForm.confirmPassword}
+                      onChange={handlePasswordChange}
+                      required
+                      disabled={!isAuthenticated}
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => togglePasswordVisibility("confirmPassword")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                      aria-label={showPasswords.confirmPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPasswords.confirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
               

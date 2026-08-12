@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { fileUploadService, FileType, UploadProgress, FileUploadResponse } from '@/lib/services/fileUpload.service';
 import { ApiResponse } from '../types/auth.types';
+import { getFriendlyErrorMessage } from '@/lib/utils/error-messages';
 
 export const useFileUpload = () => {
   const [isUploading, setIsUploading] = useState(false);
@@ -31,7 +32,7 @@ export const useFileUpload = () => {
         setUploadedFile(result.data);
         return result;
       } else {
-        const errorMessage = result.error?.message || 'Upload failed';
+        const errorMessage = getFriendlyErrorMessage(result.error, 'Upload failed. Please try again.');
         setError(errorMessage);
         return result;
       }

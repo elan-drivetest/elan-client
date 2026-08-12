@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useForgotPassword } from "@/lib/hooks/useForgotPassword";
 import { FormInput } from "@/components/ui/form-input";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { Separator } from "@/components/ui/separator";
 
 export default function ForgotPasswordPage() {
@@ -74,11 +75,7 @@ export default function ForgotPasswordPage() {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
+          <ErrorAlert message={error} />
           
           <FormInput
             label="Email Address"

@@ -13,6 +13,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatCanadianPhoneDisplay, toE164Canadian } from "@/lib/utils/phone.utils";
+import { getFriendlyErrorMessage } from "@/lib/utils/error-messages";
 
 // Define the booking interface based on the /bookings/recent API response
 interface RecentBookingResponse {
@@ -332,7 +333,7 @@ export default function Dashboard() {
       } else {
         setRecentBooking(null);
         if (response.error) {
-          setBookingsError(response.error.message || 'Failed to fetch recent booking');
+          setBookingsError(getFriendlyErrorMessage(response.error, 'Failed to load your recent booking. Please try again.'));
         }
       }
     } catch (err) {

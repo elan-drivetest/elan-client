@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForgotPassword } from "@/lib/hooks/useForgotPassword";
 import { FormInput } from "@/components/ui/form-input";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { Separator } from "@/components/ui/separator";
 
 function ResetPasswordForm() {
@@ -132,11 +133,7 @@ function ResetPasswordForm() {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {(error || localError) && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <p className="text-sm text-red-600">{error || localError}</p>
-            </div>
-          )}
+          <ErrorAlert message={error || localError} />
           
           <FormInput
             label="New Password"

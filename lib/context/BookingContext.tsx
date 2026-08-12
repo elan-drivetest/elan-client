@@ -5,6 +5,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef, useCallback } from 'react';
 import { bookingApi } from '@/lib/api';
 import { useDriveTestCenters, useAddons, useBookingCreation } from '@/lib/hooks/useBooking';
+import { getFriendlyErrorMessage } from '@/lib/utils/error-messages';
 import type { 
   DriveTestCenter, 
   Addon, 
@@ -388,7 +389,7 @@ const formattedDateTime = (() => {
           data: result.data
         };
       } else {
-        const errorMessage = result.error?.message || 'Failed to create booking';
+        const errorMessage = getFriendlyErrorMessage(result.error, "We couldn't create your booking. Please try again.");
         updateBookingState({
           isCreatingBooking: false,
           bookingError: errorMessage

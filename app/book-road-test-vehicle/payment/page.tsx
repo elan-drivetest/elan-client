@@ -8,7 +8,8 @@ import { useAuth } from "@/lib/context/AuthContext";
 import BookingStepsProgress from "@/components/booking/BookingStepsProgress";
 import TestSummary from "@/components/booking/TestSummary";
 import PickupOptions from "@/components/booking/PickupOptions";
-import { CheckCircle, CreditCard, FileText, AlertTriangle, Loader2 } from "lucide-react";
+import { CheckCircle, CreditCard, FileText, Loader2 } from "lucide-react";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { formatCanadianPhoneDisplay } from "@/lib/utils/phone.utils";
 
 const bookingSteps = [
@@ -266,17 +267,11 @@ export default function Payment() {
           
           {/* Validation Errors */}
           {bookingState.bookingError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="text-sm font-medium text-red-800 mb-2">
-                    Booking Error:
-                  </h3>
-                  <p className="text-sm text-red-700">{bookingState.bookingError}</p>
-                </div>
-              </div>
-            </div>
+            <ErrorAlert
+              title="We couldn't complete your booking"
+              message={bookingState.bookingError}
+              className="mb-6"
+            />
           )}
           
           {/* Test Type and Contact Details */}

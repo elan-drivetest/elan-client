@@ -11,6 +11,7 @@ import type {
 
 // Import booking service and types
 import { bookingService } from '@/lib/services/booking.service';
+import { getFriendlyErrorMessage } from '@/lib/utils/error-messages';
 import type {
   Addon,
   Coupon,
@@ -174,30 +175,11 @@ api.interceptors.response.use(
   }
 );
 
-// Helper function to standardize error handling
+// Helper function to standardize error handling.
+// Translates raw backend error codes (e.g. { password: "incorrectPassword" })
+// into user-friendly copy — see lib/utils/error-messages.ts for the full map.
 export const handleApiError = (error?: ApiError): string => {
-  if (!error) {
-    return 'An unexpected error occurred. Please try again.';
-  }
-
-  // Return the main error message
-  let message = error.message || 'An unexpected error occurred.';
-
-  // If there are specific field errors, append them
-  if (error.errors && typeof error.errors === 'object') {
-    const fieldErrors = Object.entries(error.errors)
-      .map(([field, messages]) => {
-        const messageArray = Array.isArray(messages) ? messages : [messages];
-        return `${field}: ${messageArray.join(', ')}`;
-      })
-      .join('; ');
-    
-    if (fieldErrors) {
-      message += ` (${fieldErrors})`;
-    }
-  }
-
-  return message;
+  return getFriendlyErrorMessage(error);
 };
 
 // Validation helper for email

@@ -12,6 +12,7 @@ import { useBooking } from "@/lib/context/BookingContext";
 import { useDriveTestCenters, useCouponVerification, useAddons } from "@/lib/hooks/useBooking";
 import { formatPrice } from "@/lib/types/booking.types";
 import { getDistancePerks, UPGRADE_PRICING } from "@/lib/utils/distance-calculator";
+import { getFriendlyErrorMessage } from "@/lib/utils/error-messages";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -161,7 +162,7 @@ export default function TestSummary({
             couponData = apiResult.data.coupon || apiResult.data;
             isValid = true;
           } else {
-            setCouponError(apiResult.error?.message || "Invalid coupon code");
+            setCouponError(getFriendlyErrorMessage(apiResult.error, "That coupon code isn't valid. Please check it and try again."));
             return;
           }
         }
