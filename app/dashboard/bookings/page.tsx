@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { bookingApi } from "@/lib/api";
 import { useRefundRequest } from "@/lib/hooks/useBooking";
+import { deriveBookingAdjustment } from "@/lib/pricing/calculate";
 import type { ApiResponse } from "@/lib/types/auth.types";
 import type { RefundRequest } from "@/lib/types/booking.types";
 
@@ -30,6 +31,7 @@ interface APIBooking {
   status: "pending" | "confirmed" | "completed" | "cancelled" | "rescheduled" | "succeeded" | "expired";
   test_result?: "PASS" | "FAIL" | null;
   coupon_code?: string | null;
+  /** @deprecated Always null from the API. Use deriveBookingAdjustment(). */
   discount_amount?: number | null;
   is_rescheduled: boolean;
   timezone: string;
@@ -597,10 +599,17 @@ const BookingCard: React.FC<{
               <span>{formatPrice(booking.addons_price)}</span>
             </div>
           )}
-          {booking.discount_amount && booking.discount_amount > 0 && (
+          {/* The components above do NOT sum to total_price whenever a
+              long-trip credit or a coupon applied, and the API's
+              `discount_amount` is always null (the real figure lives in
+              coupon_usages, which no customer endpoint exposes). So derive the
+              gap. It bundles credit and coupon together, hence the plural
+              label. Reading discount_amount here meant this row never rendered
+              and the breakdown visibly failed to add up. */}
+          {deriveBookingAdjustment(booking) > 0 && (
             <div className="flex justify-between text-green-600">
-              <span>Discount {booking.coupon_code && `(${booking.coupon_code})`}</span>
-              <span>-{formatPrice(booking.discount_amount)}</span>
+              <span>Discounts {booking.coupon_code && `(${booking.coupon_code})`}</span>
+              <span>-{formatPrice(deriveBookingAdjustment(booking))}</span>
             </div>
           )}
           <div className="flex justify-between font-medium border-t pt-2">

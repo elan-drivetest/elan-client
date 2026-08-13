@@ -135,14 +135,26 @@ export interface AddonsResponse {
 // COUPONS
 // ============================================================================
 
+/**
+ * A coupon as the CUSTOMER sees it (serialization group `me`).
+ *
+ * `discount` is deliberately typed as ambiguous: the server means percent when
+ * `discount_type` is 'percentage' (or `is_failure_coupon` is set) and cents
+ * otherwise — but `discount_type`, `min_purchase_amount`, `is_recurrent` and
+ * `is_failure_coupon` are all stripped from this response, so the client cannot
+ * tell which. Treating it as cents quoted a $0.10 saving on a 10% coupon.
+ *
+ * Do not compute a discount from this. Show the coupon as accepted, send
+ * `coupon_code` on create, and display the server's `total_price`.
+ */
 export interface Coupon extends BaseEntity {
   code: string;
-  discount: number; // in cents
-  is_recurrent: boolean;
-  is_failure_coupon: boolean;
-  min_purchase_amount: number; // in cents
-  start_date: string;
-  expires_at: string;
+  name?: string;
+  description?: string;
+  /** Percent OR cents — not determinable client-side. Display only. */
+  discount: number;
+  start_date?: string;
+  expires_at?: string;
 }
 
 export interface CouponVerifyRequest {

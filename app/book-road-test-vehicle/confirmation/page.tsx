@@ -1,12 +1,13 @@
 // app/book-road-test-vehicle/confirmation/page.tsx
 "use client"
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/context/BookingContext";
+import { bookingApi } from "@/lib/api";
 import BookingStepsProgress from "@/components/booking/BookingStepsProgress";
-import TestSummary from "@/components/booking/TestSummary";
+import TestSummary, { type ServerBookingSummary } from "@/components/booking/TestSummary";
 
 const bookingSteps = [
   { id: 1, name: "Road Test Details", path: "/book-road-test-vehicle/road-test-details" },
@@ -17,20 +18,35 @@ const bookingSteps = [
 
 export default function Confirmation() {
   const router = useRouter();
-  const { bookingState, setCurrentStep, calculatePricing } = useBooking();
+  const { bookingState, setCurrentStep } = useBooking();
+
+  // The booking now exists, so the local preview is no longer the right number
+  // to show — the server recomputed everything, applied any coupon, and charged
+  // `total_price`. Read it back rather than re-rendering our estimate.
+  const [serverBooking, setServerBooking] = useState<ServerBookingSummary | null>(null);
 
   // Use ref to prevent infinite re-renders
   const hasInitialized = useRef(false);
 
   useEffect(() => {
-    if (!hasInitialized.current) {
-      setCurrentStep(4); // Still at step 4 but completed
-      if (calculatePricing) {
-        calculatePricing();
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    setCurrentStep(4); // Still at step 4 but completed
+
+    bookingApi.getRecentBooking().then((response) => {
+      if (response.success && response.data) {
+        const booking = response.data;
+        setServerBooking({
+          base_price: booking.base_price,
+          pickup_price: booking.pickup_price,
+          addons_price: booking.addons_price,
+          total_price: booking.total_price,
+          coupon_code: booking.coupon_code,
+        });
       }
-      hasInitialized.current = true;
-    }
-  }, [calculatePricing, setCurrentStep]); // Empty dependency array to prevent infinite loops
+    });
+  }, [setCurrentStep]);
 
   // Guard the browser Back button: the booking is already submitted/paid, so
   // navigating back into the flow would let it be re-submitted. We push an
@@ -105,6 +121,7 @@ export default function Confirmation() {
             hasAddOn={!!bookingState.selectedAddOn}
             selectedAddOn={bookingState.selectedAddOn || null}
             isConfirmationPage={true} // Add this prop to disable interactive elements
+            serverBooking={serverBooking}
           />
         </div>
       </div>

@@ -22,6 +22,11 @@ function LoginContent() {
   const emailJustVerified = searchParams.get('verified') === 'true';
   const redirectParam = searchParams.get('redirect');
 
+  // "expired=true" is set by AuthProvider when the backend rejected a session
+  // that had already been established, so the user understands why they are
+  // back here instead of silently landing on a login form.
+  const sessionExpired = searchParams.get('expired') === 'true';
+
   // Where to go after a successful login:
   // 1. an internal redirect param (external/protocol-relative URLs rejected),
   // 2. else back into an in-progress booking so saved Step 1 values are kept,
@@ -145,6 +150,15 @@ function LoginContent() {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {sessionExpired && !emailJustVerified && (
+            <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+              <p className="text-sm text-amber-800">
+                Your session has expired. Please log in again to pick up where
+                you left off.
+              </p>
+            </div>
+          )}
+
           {emailJustVerified && (
             <div className="bg-green-50 border border-green-200 rounded-md p-4">
               <p className="text-sm text-green-700">

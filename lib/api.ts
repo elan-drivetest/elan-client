@@ -1,6 +1,7 @@
 // lib/api.ts - Updated to include booking services
-import axios, { AxiosError } from 'axios';
-import type { 
+import { AxiosError } from 'axios';
+import { createApiClient, refreshSession } from '@/lib/http/auth-refresh';
+import type {
   RegisterRequest, 
   LoginRequest, 
   UserProfile, 
@@ -13,167 +14,44 @@ import type {
 import { bookingService } from '@/lib/services/booking.service';
 import { getFriendlyErrorMessage } from '@/lib/utils/error-messages';
 import type {
-  Addon,
-  Coupon,
   CreateBookingRequest,
   CreateRefundRequestRequest,
   RefundRequestQueryParams} from '@/lib/types/booking.types';
 
-// Create the main API client
-const api = axios.create({
-  baseURL: 'https://api-dev.elanroadtestrental.ca/v1',
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+// Create the main API client.
+//
+// The 401 -> refresh -> retry behaviour lives in lib/http/auth-refresh.ts and is
+// shared with the booking and file-upload services, so all three coordinate on a
+// SINGLE refresh request. They previously each ran their own refresh lock, which
+// let concurrent 401s fire competing refreshes and log the user out.
+const api = createApiClient('api');
 
-// Track if we're currently refreshing to prevent multiple simultaneous refresh attempts
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (value?: unknown) => void;
-  reject: (reason?: unknown) => void;
-}> = [];
+// Convert an axios failure into our standard ApiError shape.
+//
+// Crucially this always carries a status_code: when the request never reached
+// the backend (network drop, CORS, timeout) there is no `response`, and we
+// report status_code 0. Callers — notably AuthContext — use that to tell
+// "genuinely logged out" apart from "couldn't reach the server", instead of
+// treating every failure as a logout.
+const toApiError = (error: unknown, fallbackMessage: string): ApiError => {
+  const axiosError = error as AxiosError<ApiError>;
+  const data = axiosError.response?.data;
 
-const processQueue = (error: unknown = null) => {
-  failedQueue.forEach(prom => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve();
-    }
-  });
+  // Keep the whole backend payload — `errors` in particular drives the friendly
+  // message lookup in lib/utils/error-messages.ts — and only fill in the gaps.
+  if (data && typeof data === 'object') {
+    return {
+      ...data,
+      status_code: data.status_code ?? axiosError.response?.status ?? 0,
+      message: data.message ?? fallbackMessage,
+    };
+  }
 
-  failedQueue = [];
+  return {
+    status_code: axiosError.response?.status ?? 0,
+    message: fallbackMessage,
+  };
 };
-
-// Request interceptor for debugging and cookie handling
-api.interceptors.request.use(
-  (config) => {
-    console.log('🌐 API Request:', config.method?.toUpperCase(), config.url);
-    
-    // Ensure withCredentials is set for cross-domain cookies
-    config.withCredentials = true;
-    
-    return config;
-  },
-  (error: AxiosError) => {
-    console.error('❌ Request interceptor error:', error);
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor for handling common errors and automatic token refresh
-api.interceptors.response.use(
-  (response) => {
-    // Log successful responses
-    const setCookieHeader = response.headers['set-cookie'];
-    if (setCookieHeader) {
-      console.log('🍪 Response set-cookie header:', setCookieHeader);
-    }
-
-    return response;
-  },
-  async (error: AxiosError) => {
-    const originalRequest = error.config as typeof error.config & { _retry?: boolean };
-    console.log('❌ API Error:', error.response?.status, error.response?.data);
-
-    // Handle 401 unauthorized errors with automatic token refresh
-    if (error.response?.status === 401 && originalRequest) {
-      const isLoginEndpoint = originalRequest.url?.includes('/login');
-      const isRefreshEndpoint = originalRequest.url?.includes('/refresh');
-      const isRegisterEndpoint = originalRequest.url?.includes('/register');
-      const isConfirmEndpoint = originalRequest.url?.includes('/confirm');
-
-      // Don't attempt refresh for auth endpoints or if already retried
-      if (isLoginEndpoint || isRefreshEndpoint || isRegisterEndpoint || isConfirmEndpoint || originalRequest._retry) {
-        console.log('🚫 401 on auth endpoint or already retried - not refreshing');
-
-        // Don't redirect if on pages that handle auth themselves
-        // (booking flow handles auth in Step 2; /confirm-email decides its own
-        // fallback destination and must not be hijacked mid-verification)
-        const isOnSelfManagedAuthPage = typeof window !== 'undefined' &&
-          (window.location.pathname.includes('/book-road-test-vehicle') ||
-            window.location.pathname.includes('/confirm-email'));
-
-        // Only redirect if not on a public auth page or self-managed page
-        if (!isLoginEndpoint && !isRegisterEndpoint && !isConfirmEndpoint && !isOnSelfManagedAuthPage && typeof window !== 'undefined') {
-          console.log('🚨 Redirecting to login due to auth failure');
-          // Clear cookies
-          document.cookie = '_elanAuth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
-          document.cookie = '_elanAuthR=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
-          window.location.href = '/login';
-        }
-
-        return Promise.reject(error);
-      }
-
-      // NOTE: We intentionally do NOT pre-check for a refresh-token cookie here.
-      // The refresh token (_elanAuthR) is set by the API domain and/or is
-      // HttpOnly, so it is invisible to document.cookie on the frontend — any
-      // such check would always report "missing" and wrongly skip the refresh.
-      // Instead we always attempt the refresh; the backend is the source of
-      // truth and returns 401 if there is genuinely no valid refresh token.
-
-      // If we're already refreshing, queue this request
-      if (isRefreshing) {
-        console.log('⏳ Token refresh in progress, queueing request...');
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then(() => {
-            return api(originalRequest);
-          })
-          .catch(err => {
-            return Promise.reject(err);
-          });
-      }
-
-      // Mark that we're refreshing
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      console.log('🔄 Attempting token refresh...');
-
-      try {
-        // Attempt to refresh the token
-        await api.post('/auth/customer/refresh');
-        console.log('✅ Token refresh successful');
-
-        // Process queued requests
-        processQueue();
-        isRefreshing = false;
-
-        // Retry the original request
-        return api(originalRequest);
-      } catch (refreshError) {
-        console.error('❌ Token refresh failed:', refreshError);
-
-        // Reject all queued requests
-        processQueue(refreshError);
-        isRefreshing = false;
-
-        // Don't redirect if on pages that handle auth themselves
-        // (booking flow and /confirm-email decide their own destinations)
-        const isOnSelfManagedAuthPage = typeof window !== 'undefined' &&
-          (window.location.pathname.includes('/book-road-test-vehicle') ||
-            window.location.pathname.includes('/confirm-email'));
-
-        // Clear cookies and redirect to login (only if not on a self-managed page)
-        if (typeof window !== 'undefined' && !isOnSelfManagedAuthPage) {
-          console.log('🚨 Redirecting to login after failed refresh');
-          document.cookie = '_elanAuth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
-          document.cookie = '_elanAuthR=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
-          window.location.href = '/login';
-        }
-
-        return Promise.reject(refreshError);
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
 
 // Helper function to standardize error handling.
 // Translates raw backend error codes (e.g. { password: "incorrectPassword" })
@@ -365,9 +243,9 @@ export const authApi = {
     } catch (error) {
       const axiosError = error as AxiosError<ApiError>;
       console.error('❌ Login failed:', axiosError.response?.data);
-      return { 
-        success: false, 
-        error: axiosError.response?.data 
+      return {
+        success: false,
+        error: toApiError(error, 'Login failed. Please try again.'),
       };
     }
   },
@@ -378,8 +256,10 @@ export const authApi = {
       const response = await api.get('/auth/customer/me');
       return { success: true, data: response.data };
     } catch (error) {
-      const axiosError = error as AxiosError<ApiError>;
-      return { success: false, error: axiosError.response?.data };
+      return {
+        success: false,
+        error: toApiError(error, 'Could not verify your session. Please try again.'),
+      };
     }
   },
 
@@ -393,26 +273,30 @@ export const authApi = {
     } catch (error) {
       const axiosError = error as AxiosError<ApiError>;
       console.error('❌ Profile update failed:', axiosError.response?.data);
-      return { success: false, error: axiosError.response?.data };
+      return {
+        success: false,
+        error: toApiError(error, 'Could not update your profile. Please try again.'),
+      };
     }
   },
 
-  // Refresh authentication token
-  refreshToken: async (): Promise<ApiResponse<UserProfile>> => {
+  // Refresh authentication token.
+  //
+  // Routed through the shared coordinator so a manual refresh can never race the
+  // interceptor-driven one. The refresh endpoint only rotates cookies — it does
+  // not return a profile — so the caller must re-read /auth/customer/me
+  // afterwards to get user data (see AuthContext.refreshAuth).
+  refreshToken: async (): Promise<ApiResponse> => {
     try {
       console.log('🔄 Refreshing authentication token...');
-      const response = await api.post('/auth/customer/refresh');
+      await refreshSession();
       console.log('✅ Token refresh successful');
-      return {
-        success: true,
-        data: response.data
-      };
+      return { success: true };
     } catch (error) {
-      const axiosError = error as AxiosError<ApiError>;
-      console.error('❌ Token refresh failed:', axiosError.response?.data);
+      console.error('❌ Token refresh failed');
       return {
         success: false,
-        error: axiosError.response?.data
+        error: toApiError(error, 'Your session could not be renewed. Please log in again.'),
       };
     }
   },
@@ -474,16 +358,11 @@ export const bookingApi = {
   calculateDistanceAPI: (pickupLat: number, pickupLng: number, testCenterLat: number, testCenterLng: number) =>
     bookingService.calculateDistanceAPI(pickupLat, pickupLng, testCenterLat, testCenterLng),
 
-  // Utility methods
+  // Utility methods.
+  // NOTE: there is deliberately no pricing helper here. All price maths lives
+  // in lib/pricing/, which mirrors the server engine in one place.
   calculateDistance: (pickup: { lat: number; lng: number }, testCenter: { lat: number; lng: number }) =>
     bookingService.calculateDistance(pickup, testCenter),
-  calculatePricingBreakdown: (params: {
-    basePrice: number;
-    pickupDistance?: number;
-    meetAtCenter?: boolean;
-    addon?: Addon | null;
-    coupon?: Coupon | null;
-  }) => bookingService.calculatePricingBreakdown(params),
   validateBookingData: (data: CreateBookingRequest) => bookingService.validateBookingData(data),
 
   // Refund Requests

@@ -3,16 +3,23 @@
 "use client"
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef, useCallback } from 'react';
-import { bookingApi } from '@/lib/api';
 import { useDriveTestCenters, useAddons, useBookingCreation } from '@/lib/hooks/useBooking';
 import { getFriendlyErrorMessage } from '@/lib/utils/error-messages';
-import type { 
-  DriveTestCenter, 
-  Addon, 
-  Coupon, 
-  CreateBookingRequest, 
-  PricingBreakdown,
-  TestType 
+import {
+  findThirtyMinuteLesson,
+  previewBookingPrice,
+  type BookingPricePreview,
+} from '@/lib/pricing/calculate';
+import {
+  getPricingConfig,
+  PRICING_CONFIG_FALLBACK,
+  type PricingConfig,
+} from '@/lib/pricing/config';
+import type {
+  DriveTestCenter,
+  Addon,
+  CreateBookingRequest,
+  TestType
 } from '@/lib/types/booking.types';
 
 // File metadata interface for uploaded documents
@@ -46,28 +53,24 @@ export interface BookingState {
   // Step 3: Test Details & Add-ons
   selectedAddOn?: 'mock-test' | 'driving-lesson' | null;
   selectedAddonData?: Addon | null; // Store the actual addon data from API
-  freeAddOn?: 'thirty-min-lesson' | 'one-hour-lesson' | null;
   documents?: {
     roadTestFile?: string;
     licenseFile?: string;
     roadTestFileMetadata?: FileMetadata;
     licenseFileMetadata?: FileMetadata;
   };
-  
+
   // Step 4: Payment
   couponCode?: string;
-  appliedCoupon?: Coupon | null;
-  pricing?: {
-    basePrice: number; // Legacy format for compatibility
-    pickupPrice: number;
-    addOnPrice: number;
-    discounts: number;
-    total: number;
-  };
-  
-  // API-compatible pricing breakdown
-  apiPricing?: PricingBreakdown;
-  
+
+  /**
+   * Display-only price preview, in integer cents, mirroring the server engine.
+   *
+   * NOT the amount charged — the server recomputes everything on create. Read
+   * `total_price` off the created booking for that.
+   */
+  pricePreview?: BookingPricePreview;
+
   // Booking creation state
   isCreatingBooking?: boolean;
   createdBooking?: any;
@@ -94,6 +97,9 @@ interface BookingContextType {
   isLoadingCenters: boolean;
   isLoadingAddons: boolean;
 
+  /** Pickup fare tiers from GET /pricing-config. Never hardcode these. */
+  pricingConfig: PricingConfig;
+
   // Refetch method - call after authentication
   refetchBookingData: () => void;
 }
@@ -109,22 +115,10 @@ const initialState: BookingState = {
   locationOption: 'test-centre',
   selectedAddOn: null,
   selectedAddonData: null,
-  freeAddOn: null,
-  pricing: {
-    basePrice: 80.00, // Default base price
-    pickupPrice: 0,
-    addOnPrice: 0,
-    discounts: 0,
-    total: 80.00
-  },
-  apiPricing: {
-    base_price: 8000, // In cents
-    pickup_price: 0,
-    addon_price: 0,
-    subtotal: 8000,
-    discount_amount: 0,
-    total_price: 8000
-  }
+  // No seeded price. There is no such thing as a default base fare — it comes
+  // from the selected test centre. Seeding one meant a failed centre lookup
+  // silently quoted $80 instead of showing nothing.
+  pricePreview: undefined,
 };
 
 // Create the context
@@ -143,6 +137,25 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const { centers: testCenters, loading: isLoadingCenters, refetch: refetchCenters } = useDriveTestCenters(true);
   const { addons, loading: isLoadingAddons, refetch: refetchAddons } = useAddons(undefined, false);
   const { createBooking: apiCreateBooking } = useBookingCreation();
+
+  // Pickup fare tiers, served by the backend. Starts on the same fallback the
+  // server itself uses so the first render has something sane, then swaps to
+  // the live values. Fetched once per provider mount.
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig>(
+    PRICING_CONFIG_FALLBACK
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    getPricingConfig().then((config) => {
+      if (active) setPricingConfig(config);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Method to refetch all booking data (call after authentication or on Step 3)
   const refetchBookingData = useCallback(() => {
@@ -195,24 +208,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     }
   }, [currentStep]);
 
-  // Update booking state with API pricing sync
   const updateBookingState = useCallback((updates: Partial<BookingState>) => {
-    setBookingState(prevState => {
-      const newState = { ...prevState, ...updates };
-
-      // Sync legacy pricing with API pricing if needed
-      if (updates.apiPricing && !updates.pricing) {
-        newState.pricing = {
-          basePrice: updates.apiPricing.base_price / 100,
-          pickupPrice: updates.apiPricing.pickup_price / 100,
-          addOnPrice: updates.apiPricing.addon_price / 100,
-          discounts: updates.apiPricing.discount_amount / 100,
-          total: updates.apiPricing.total_price / 100
-        };
-      }
-
-      return newState;
-    });
+    setBookingState(prevState => ({ ...prevState, ...updates }));
   }, []);
 
   // Function to reset booking state
@@ -225,38 +222,38 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Enhanced pricing calculation with API integration
+  /**
+   * Recompute the display-only price preview.
+   *
+   * Every input is server-supplied: the fare tiers from GET /pricing-config,
+   * the base fare from the selected centre, add-on prices (including the
+   * 30-minute lesson the long-trip concession credits back) from GET /addons,
+   * and the distance from POST /bookings/calculate-distance.
+   */
   const calculatePricing = useCallback(() => {
-    const { testCenter, pickupDistance, locationOption, selectedAddonData, appliedCoupon } = bookingState;
-    
+    const { testCenter, pickupDistance, locationOption, selectedAddonData, testType } = bookingState;
+
     if (!testCenter) return;
 
     try {
       const meetAtCenter = locationOption === 'test-centre';
-      const basePrice = testCenter.base_price;
-      
-      const pricingBreakdown = bookingApi.calculatePricingBreakdown({
-        basePrice,
-        pickupDistance: meetAtCenter ? 0 : (pickupDistance || 0),
+
+      const preview = previewBookingPrice({
+        config: pricingConfig,
+        centerBasePrice: testCenter.base_price,
+        distanceKm: pickupDistance,
         meetAtCenter,
-        addon: selectedAddonData,
-        coupon: appliedCoupon
+        selectedAddon: selectedAddonData,
+        thirtyMinuteLesson: testType
+          ? findThirtyMinuteLesson(addons, testType)
+          : null,
       });
 
-      updateBookingState({
-        apiPricing: pricingBreakdown,
-        pricing: {
-          basePrice: basePrice / 100,
-          pickupPrice: pricingBreakdown.pickup_price / 100,
-          addOnPrice: pricingBreakdown.addon_price / 100,
-          discounts: pricingBreakdown.discount_amount / 100,
-          total: pricingBreakdown.total_price / 100
-        }
-      });
+      updateBookingState({ pricePreview: preview });
     } catch (error) {
       console.error('Error calculating pricing:', error);
     }
-  }, [bookingState, updateBookingState]);
+  }, [bookingState, updateBookingState, pricingConfig, addons]);
 
   // Transform booking state to API format
   const transformToApiFormat = (): CreateBookingRequest | null => {
@@ -271,11 +268,11 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       pickupDistance,
       selectedAddonData,
       documents,
-      apiPricing,
+      pricePreview,
       couponCode
     } = bookingState;
 
-    if (!testCenter || !testType || !testDate || !testTime || !documents?.roadTestFile || !documents?.licenseFile || !apiPricing) {
+    if (!testCenter || !testType || !testDate || !testTime || !documents?.roadTestFile || !documents?.licenseFile || !pricePreview) {
       return null;
     }
 
@@ -316,10 +313,14 @@ const formattedDateTime = (() => {
       pickup_latitude: meetAtCenter ? undefined : pickupCoordinates?.lat,
       pickup_longitude: meetAtCenter ? undefined : pickupCoordinates?.lng,
       pickup_distance: meetAtCenter ? undefined : pickupDistance,
-      base_price: apiPricing.base_price,
-      pickup_price: apiPricing.pickup_price,
+      // The DTO marks these @IsNotEmpty(), so the request fails validation
+      // without them — but BookingsService.create() recomputes and overwrites
+      // all of them before insert. They satisfy validation; they do not set the
+      // price. The coupon is applied server-side from `coupon_code`.
+      base_price: pricePreview.basePrice,
+      pickup_price: pricePreview.pickupPrice,
       addon_id: selectedAddonData?.id,
-      total_price: apiPricing.total_price,
+      total_price: pricePreview.total,
       coupon_code: couponCode,
       timezone: 'America/Toronto' // Default timezone for Ontario
     };
@@ -428,6 +429,7 @@ const formattedDateTime = (() => {
     addons,
     isLoadingCenters,
     isLoadingAddons,
+    pricingConfig,
     refetchBookingData
   };
 

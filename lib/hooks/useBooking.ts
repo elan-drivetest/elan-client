@@ -417,82 +417,8 @@ export const useBookingCreation = () => {
   };
 };
 
-// ============================================================================
-// PRICING CALCULATION HOOK
-// ============================================================================
-
-export const usePricingCalculation = () => {
-  const [pricing, setPricing] = useState<PricingBreakdown>({
-    base_price: 0,
-    pickup_price: 0,
-    addon_price: 0,
-    subtotal: 0,
-    discount_amount: 0,
-    total_price: 0
-  });
-
-  const calculatePricing = useCallback(({
-    basePrice,
-    pickupDistance = 0,
-    meetAtCenter = true,
-    addon = null,
-    coupon = null
-  }: {
-    basePrice: number;
-    pickupDistance?: number;
-    meetAtCenter?: boolean;
-    addon?: Addon | null;
-    coupon?: Coupon | null;
-  }) => {
-    const newPricing = bookingApi.calculatePricingBreakdown({
-      basePrice,
-      pickupDistance,
-      meetAtCenter,
-      addon,
-      coupon
-    });
-    
-    setPricing(newPricing);
-    return newPricing;
-  }, []);
-
-  const updateBasePrice = useCallback((basePrice: number) => {
-    setPricing(prev => {
-      const updated = { ...prev, base_price: basePrice };
-      updated.subtotal = updated.base_price + updated.pickup_price + updated.addon_price;
-      updated.total_price = Math.max(0, updated.subtotal - updated.discount_amount);
-      return updated;
-    });
-  }, []);
-
-  const updatePickupPrice = useCallback((pickupPrice: number) => {
-    setPricing(prev => {
-      const updated = { ...prev, pickup_price: pickupPrice };
-      updated.subtotal = updated.base_price + updated.pickup_price + updated.addon_price;
-      updated.total_price = Math.max(0, updated.subtotal - updated.discount_amount);
-      return updated;
-    });
-  }, []);
-
-  const resetPricing = useCallback(() => {
-    setPricing({
-      base_price: 0,
-      pickup_price: 0,
-      addon_price: 0,
-      subtotal: 0,
-      discount_amount: 0,
-      total_price: 0
-    });
-  }, []);
-
-  return {
-    pricing,
-    calculatePricing,
-    updateBasePrice,
-    updatePickupPrice,
-    resetPricing
-  };
-};
+// The pricing-calculation hook that used to live here was a sixth, unused copy
+// of the fare maths. Pricing lives only in lib/pricing/ now.
 
 // ============================================================================
 // REFUND REQUESTS HOOK

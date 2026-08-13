@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/services/fileUpload.service.ts - Updated to remove DocumentType dependency
-import axios, { AxiosInstance, AxiosProgressEvent } from 'axios';
+import { AxiosInstance, AxiosProgressEvent } from 'axios';
+import { createApiClient } from '@/lib/http/auth-refresh';
 
 export type FileType = 'profile' | 'g2' | 'license';
 
@@ -42,57 +43,35 @@ class FileUploadService {
   private apiClient: AxiosInstance;
 
   constructor() {
-    this.apiClient = axios.create({
-      baseURL: 'https://api-dev.elanroadtestrental.ca/v1',
-      withCredentials: true,
-    });
+    // Uses the shared client so uploads get the same 401 -> refresh -> retry
+    // treatment as every other call. This service previously had NO 401
+    // handling at all: once the short-lived access token expired, document
+    // uploads in booking Step 3 failed outright instead of refreshing.
+    //
+    // `false` skips the JSON Content-Type default — axios must set
+    // multipart/form-data itself so it can attach the correct boundary.
+    this.apiClient = createApiClient('file-upload', false);
 
-    // Request interceptor to ensure cookies are sent
+    // Request interceptor for FormData handling.
+    //
+    // The previous version also logged the entire document.cookie on every
+    // request and warned about "missing" auth cookies. That check was always
+    // wrong — the auth cookies belong to the API domain and the refresh cookie
+    // is HttpOnly, so JS can never see them — and dumping the cookie jar to the
+    // console in production is not something we want.
     this.apiClient.interceptors.request.use(
       (config) => {
         console.log('File Upload Request:', config.method?.toUpperCase(), config.url);
-        
+
         // For file uploads, don't manually set Content-Type
         // axios will set it automatically with proper boundary for FormData
         if (config.data instanceof FormData) {
           delete config.headers['Content-Type'];
         }
-        
-        // Ensure withCredentials is set for cookie authentication
-        config.withCredentials = true;
-        
-        // Log cookies being sent (for debugging)
-        if (typeof window !== 'undefined') {
-          const cookies = document.cookie;
-          const hasAuthCookie = cookies.includes('_elanAuth');
-          const hasRefreshCookie = cookies.includes('_elanAuthR');
-          
-          console.log('🍪 File upload cookie check:', {
-            hasAuthCookie,
-            hasRefreshCookie,
-            cookieString: cookies
-          });
-          
-          if (!hasAuthCookie || !hasRefreshCookie) {
-            console.warn('⚠️ Missing authentication cookies for file upload');
-          }
-        }
-        
+
         return config;
       },
       (error) => {
-        return Promise.reject(error);
-      }
-    );
-
-    // Response interceptor for error handling
-    this.apiClient.interceptors.response.use(
-      (response) => {
-        console.log('File Upload Success:', response.status, response.data);
-        return response;
-      },
-      (error) => {
-        console.error('File Upload API Error:', error.response?.status, error.response?.data);
         return Promise.reject(error);
       }
     );

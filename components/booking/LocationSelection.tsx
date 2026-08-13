@@ -6,8 +6,9 @@ import { Check, AlertTriangle, MapPin, Navigation, Loader2, X } from "lucide-rea
 import { cn } from "@/lib/utils";
 import { useBooking } from "@/lib/context/BookingContext";
 import { useAddressSearch } from "@/lib/hooks/useBooking";
-import { AddressSearchResult } from "@/lib/types/booking.types";
+import { AddressSearchResult, formatPrice } from "@/lib/types/booking.types";
 import { bookingUtils } from "@/lib/utils/booking.utils";
+import { findThirtyMinuteLesson, previewPickupPrice } from "@/lib/pricing/calculate";
 
 export type LocationOption = "test-centre" | "pickup";
 
@@ -71,7 +72,12 @@ export default function LocationSelection({
   onPickupLocationSelect,
   testCenterCoordinates,
 }: LocationSelectionProps) {
-  const { bookingState, updateBookingState } = useBooking();
+  const { bookingState, updateBookingState, pricingConfig, addons } = useBooking();
+
+  // The add-on whose price the server credits back on long pickups.
+  const thirtyMinuteLesson = bookingState.testType
+    ? findThirtyMinuteLesson(addons, bookingState.testType)
+    : null;
   const [pickupLocation, setPickupLocation] = useState(bookingState.pickupAddress || "");
   const [pickupDistance, setPickupDistance] = useState<number | undefined>(bookingState.pickupDistance);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -547,42 +553,31 @@ export default function LocationSelection({
               <h4 className="text-sm font-medium text-blue-900 mb-2">Distance & Pricing</h4>
               <div className="space-y-1 text-sm text-blue-800">
                 <p>• Distance to test center: {pickupDistance?.toFixed(1) || '0'} km</p>
-                <p>• Pickup fee: {bookingUtils.formatPrice(
-                  bookingUtils.dollarsToCents(
-                    (pickupDistance || 0) <= 50 
-                      ? (pickupDistance || 0) * 1 
-                      : (50 * 1) + (((pickupDistance || 0) - 50) * 0.5)
-                  )
-                )}</p>
+                {/* Uses the shared engine and the server's live fare tiers —
+                    this used to re-implement the formula inline, in dollars. */}
+                <p>• Pickup fee: {formatPrice(previewPickupPrice(pickupDistance || 0, pricingConfig))}</p>
               </div>
             </div>
           )}
 
-          {/* Special Perks Display */}
-          {pickupDistance !== undefined && pickupDistance >= 50 && (
+          {/* Long-trip credit. The threshold is the server's base_distance and
+              the amount is the real 30-minute lesson price, so this cannot
+              promise a benefit the backend does not grant. */}
+          {pickupDistance !== undefined &&
+            pickupDistance > pricingConfig.baseDistance &&
+            thirtyMinuteLesson && (
             <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-start gap-2">
                 <Check className="h-5 w-5 text-[#0C8B44] flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="font-medium text-sm text-green-900">You qualify for special perks!</h4>
-                  <ul className="mt-2 space-y-1">
-                    <li className="flex items-center gap-1 text-xs text-green-800">
-                      <Check size={14} className="text-[#0C8B44]" />
-                      <span>Free dropoff service</span>
-                    </li>
-                    {pickupDistance >= 50 && pickupDistance < 100 && (
-                      <li className="flex items-center gap-1 text-xs text-green-800">
-                        <Check size={14} className="text-[#0C8B44]" />
-                        <span>Free 30-minute driving lesson</span>
-                      </li>
-                    )}
-                    {pickupDistance >= 100 && (
-                      <li className="flex items-center gap-1 text-xs text-green-800">
-                        <Check size={14} className="text-[#0C8B44]" />
-                        <span>Free 1-hour driving lesson</span>
-                      </li>
-                    )}
-                  </ul>
+                  <h4 className="font-medium text-sm text-green-900">
+                    You qualify for a long-trip credit
+                  </h4>
+                  <p className="mt-1 text-xs text-green-800">
+                    Your pickup is past {pricingConfig.baseDistance} km, so we&apos;ll take{' '}
+                    {formatPrice(thirtyMinuteLesson.price)} off any lesson or mock
+                    test you add.
+                  </p>
                 </div>
               </div>
             </div>
@@ -591,8 +586,11 @@ export default function LocationSelection({
           {/* Helper Text */}
           <div className="mt-3 text-xs text-gray-500">
             <p>💡 Tip: Include your postal code for better accuracy</p>
-            <p>• Distance-based pricing: First 50km at $1/km, then $0.50/km</p>
-            <p>• Free dropoff service for distances over 50km</p>
+            <p>
+              • Distance-based pricing: first {pricingConfig.baseDistance} km at{' '}
+              {formatPrice(pricingConfig.baseRate)}/km, then{' '}
+              {formatPrice(pricingConfig.normalRate)}/km
+            </p>
           </div>
         </div>
       )}

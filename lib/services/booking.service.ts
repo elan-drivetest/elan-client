@@ -1,6 +1,7 @@
 // lib/services/booking.service.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import { AxiosInstance } from 'axios';
+import { createApiClient } from '@/lib/http/auth-refresh';
 import type {
   ApiResponse,
   ApiError,
@@ -13,9 +14,7 @@ import type {
   RecentBooking,
   CreateBookingRequest,
   DistanceCalculationRequest,
-  DistanceCalculationResponse,
-  PricingBreakdown,
-  Coordinates} from '@/lib/types/booking.types';
+  DistanceCalculationResponse} from '@/lib/types/booking.types';
 
 // ============================================================================
 // BOOKING API SERVICE CLASS
@@ -23,129 +22,15 @@ import type {
 
 class BookingApiService {
   private apiClient: AxiosInstance;
-  private isRefreshing = false;
-  private failedQueue: Array<{
-    resolve: (value?: unknown) => void;
-    reject: (reason?: unknown) => void;
-  }> = [];
 
   constructor() {
-    this.apiClient = axios.create({
-      baseURL: 'https://api-dev.elanroadtestrental.ca/v1',
-      withCredentials: true,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    this.setupInterceptors();
-  }
-
-  private processQueue(error: unknown = null): void {
-    this.failedQueue.forEach(prom => {
-      if (error) {
-        prom.reject(error);
-      } else {
-        prom.resolve();
-      }
-    });
-
-    this.failedQueue = [];
-  }
-
-  // ============================================================================
-  // INTERCEPTORS SETUP
-  // ============================================================================
-
-  private setupInterceptors(): void {
-    // Request interceptor
-    this.apiClient.interceptors.request.use(
-      (config) => {
-        console.log('🔍 Booking API Request:', config.method?.toUpperCase(), config.url);
-        config.withCredentials = true;
-        return config;
-      },
-      (error: AxiosError) => {
-        console.error('❌ Booking API Request Error:', error);
-        return Promise.reject(error);
-      }
-    );
-
-    // Response interceptor with automatic token refresh
-    this.apiClient.interceptors.response.use(
-      (response) => {
-        console.log('✅ Booking API Response:', response.status, response.config.url);
-        return response;
-      },
-      async (error: AxiosError) => {
-        const originalRequest = error.config as typeof error.config & { _retry?: boolean };
-        console.error('❌ Booking API Error:', error.response?.status, error.response?.data);
-
-        // Handle 401 errors with automatic token refresh
-        if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
-          const isRefreshEndpoint = originalRequest.url?.includes('/refresh');
-          const isRegisterEndpoint = originalRequest.url?.includes('/register');
-          const isLoginEndpoint = originalRequest.url?.includes('/login');
-          const isConfirmEndpoint = originalRequest.url?.includes('/confirm');
-
-          // Don't attempt refresh for auth endpoints
-          if (isRefreshEndpoint || isRegisterEndpoint || isLoginEndpoint || isConfirmEndpoint) {
-            return Promise.reject(error);
-          }
-
-          // NOTE: No client-side refresh-token pre-check here. The _elanAuthR
-          // cookie is set by the API domain and/or is HttpOnly, so it is not
-          // readable via document.cookie on the frontend — checking it would
-          // always report "missing" and wrongly skip the refresh. We attempt
-          // the refresh and let the backend reject with 401 if it is invalid.
-
-          // If we're already refreshing, queue this request
-          if (this.isRefreshing) {
-            console.log('⏳ Token refresh in progress (booking service), queueing request...');
-            return new Promise((resolve, reject) => {
-              this.failedQueue.push({ resolve, reject });
-            })
-              .then(() => {
-                return this.apiClient(originalRequest);
-              })
-              .catch(err => {
-                return Promise.reject(err);
-              });
-          }
-
-          // Mark that we're refreshing
-          originalRequest._retry = true;
-          this.isRefreshing = true;
-
-          console.log('🔄 Attempting token refresh (booking service)...');
-
-          try {
-            // Attempt to refresh the token
-            await this.apiClient.post('/auth/customer/refresh');
-            console.log('✅ Token refresh successful (booking service)');
-
-            // Process queued requests
-            this.processQueue();
-            this.isRefreshing = false;
-
-            // Retry the original request
-            return this.apiClient(originalRequest);
-          } catch (refreshError) {
-            console.log('❌ Token refresh failed (booking service) - user likely unauthenticated');
-
-            // Process queued requests with error
-            this.processQueue(refreshError);
-            this.isRefreshing = false;
-
-            // Don't redirect for booking endpoints - let the page handle it
-            // This allows unauthenticated users to browse the booking flow
-            return Promise.reject(error);
-          }
-        }
-
-        return Promise.reject(error);
-      }
-    );
+    // Shares the single app-wide refresh coordinator with lib/api.ts and the
+    // file-upload service. This class used to own a private isRefreshing flag
+    // and queue, which meant a booking request and an auth request that 401'd at
+    // the same moment each fired their own POST /auth/customer/refresh — and
+    // with server-side refresh-token rotation, the loser of that race killed the
+    // session. See lib/http/auth-refresh.ts.
+    this.apiClient = createApiClient('booking');
   }
 
   // ============================================================================
@@ -517,171 +402,24 @@ class BookingApiService {
   // ============================================================================
 
   /**
-   * Calculate distance between two coordinates using backend API with frontend fallback
+   * Driving distance to the test centre, in kilometres.
+   *
+   * Sourced from POST /bookings/calculate-distance (Google Distance Matrix),
+   * the same figure the server prices against.
+   *
+   * There is deliberately no local fallback. The previous Haversine fallback
+   * returned straight-line distance, which is always shorter than the driving
+   * route, so an API failure silently under-quoted the pickup fare. Rejecting
+   * is correct: without a real distance there is no honest price to show.
    */
   async calculateDistance(pickup: { lat: number; lng: number }, testCenter: { lat: number; lng: number }): Promise<number> {
-    try {
-      const response = await this.calculateDistanceAPI(pickup.lat, pickup.lng, testCenter.lat, testCenter.lng);
-      
-      if (response.success && response.data) {
-        console.log('✅ Backend distance calculation successful:', response.data.distance_km);
-        return response.data.distance_km;
-      } else {
-        console.warn('⚠️ Backend distance calculation failed, falling back to frontend calculation');
-        return this.calculateDistanceFrontend(pickup, testCenter);
-      }
-    } catch (error) {
-      console.error('❌ Backend distance calculation error, falling back to frontend calculation:', error);
-      return this.calculateDistanceFrontend(pickup, testCenter);
-    }
-  }
+    const response = await this.calculateDistanceAPI(pickup.lat, pickup.lng, testCenter.lat, testCenter.lng);
 
-  /**
-   * Frontend fallback distance calculation using Haversine formula
-   */
-  private calculateDistanceFrontend(pickup: { lat: number; lng: number }, testCenter: { lat: number; lng: number }): number {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = this.toRadians(testCenter.lat - pickup.lat);
-    const dLng = this.toRadians(testCenter.lng - pickup.lng);
-    
-    const a = 
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRadians(pickup.lat)) * Math.cos(this.toRadians(testCenter.lat)) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-    
-    return Math.round(distance * 10) / 10; // Round to 1 decimal place
-  }
-
-  private toRadians(degrees: number): number {
-    return degrees * (Math.PI / 180);
-  }
-
-  /**
-   * Calculate comprehensive pricing breakdown - ENHANCED WITH BACKEND DISTANCE API
-   */
-  async calculatePricingBreakdownAsync(params: {
-    basePrice: number;
-    pickupCoordinates?: Coordinates;
-    testCenterCoordinates?: Coordinates;
-    meetAtCenter?: boolean;
-    addon?: Addon | null;
-    coupon?: Coupon | null;
-  }): Promise<PricingBreakdown> {
-    let pickup_price = 0;
-    let addon_price = 0;
-    let discount_amount = 0;
-
-    // Calculate pickup price using backend distance calculation
-    if (!params.meetAtCenter && params.pickupCoordinates && params.testCenterCoordinates) {
-      try {
-        const distance = await this.calculateDistance(params.pickupCoordinates, params.testCenterCoordinates);
-        const pickupCalculation = this.calculatePickupPricing(distance);
-        pickup_price = pickupCalculation.pickup_price;
-      } catch (error) {
-        console.error('❌ Error calculating pickup price:', error);
-        // Pickup price remains 0 if calculation fails
-      }
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || 'Could not calculate the distance to the test centre');
     }
 
-    // Calculate addon price
-    if (params.addon) {
-      addon_price = params.addon.price;
-    }
-
-    // Calculate subtotal
-    const subtotal = params.basePrice + pickup_price + addon_price;
-
-    // Apply coupon discount
-    if (params.coupon && subtotal >= params.coupon.min_purchase_amount) {
-      discount_amount = Math.min(params.coupon.discount, subtotal);
-    }
-
-    // Calculate final total
-    const total_price = Math.max(0, subtotal - discount_amount);
-
-    return {
-      base_price: params.basePrice,
-      pickup_price,
-      addon_price,
-      subtotal,
-      discount_amount,
-      total_price,
-      coupon_code: params.coupon?.code
-    };
-  }
-
-  /**
-   * Calculate pickup pricing based on distance
-   */
-  calculatePickupPricing(distanceKm: number): { pickup_price: number; is_free_pickup: boolean } {
-    if (distanceKm <= 0) {
-      return { pickup_price: 0, is_free_pickup: true };
-    }
-
-    // First 50km: $1/km, additional distance: $0.50/km
-    let pickup_price = 0;
-    
-    if (distanceKm <= 50) {
-      pickup_price = distanceKm * 100; // $1/km in cents
-    } else {
-      pickup_price = (50 * 100) + ((distanceKm - 50) * 50); // First 50km + additional at $0.50/km
-    }
-
-    return {
-      pickup_price: Math.round(pickup_price),
-      is_free_pickup: false
-    };
-  }
-
-  /**
-   * Calculate comprehensive pricing breakdown - LEGACY SYNC VERSION
-   * Maintained for backward compatibility
-   */
-  calculatePricingBreakdown(params: {
-    basePrice: number;
-    pickupDistance?: number;
-    meetAtCenter?: boolean;
-    addon?: Addon | null;
-    coupon?: Coupon | null;
-  }): PricingBreakdown {
-    let pickup_price = 0;
-    let addon_price = 0;
-    let discount_amount = 0;
-
-    // Calculate pickup price
-    if (!params.meetAtCenter && params.pickupDistance && params.pickupDistance > 0) {
-      const pickupCalculation = this.calculatePickupPricing(params.pickupDistance);
-      pickup_price = pickupCalculation.pickup_price;
-    }
-
-    // Calculate addon price
-    if (params.addon) {
-      addon_price = params.addon.price;
-    }
-
-    // Calculate subtotal
-    const subtotal = params.basePrice + pickup_price + addon_price;
-
-    // Apply coupon discount
-    if (params.coupon && subtotal >= params.coupon.min_purchase_amount) {
-      discount_amount = Math.min(params.coupon.discount, subtotal);
-    }
-
-    // Calculate final total
-    const total_price = Math.max(0, subtotal - discount_amount);
-
-    return {
-      base_price: params.basePrice,
-      pickup_price,
-      addon_price,
-      subtotal,
-      discount_amount,
-      total_price,
-      coupon_code: params.coupon?.code
-    };
+    return response.data.distance_km;
   }
 
   /**

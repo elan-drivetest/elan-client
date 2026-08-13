@@ -1,8 +1,18 @@
-// lib/context/AuthContext.tsx - Fixed to not auto-check auth on mount
+// lib/context/AuthContext.tsx
 "use client"
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  ReactNode,
+} from 'react';
+import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
+import { onSessionExpired } from '@/lib/http/session-events';
 import type { UserProfile } from '@/lib/types/auth.types';
 
 interface AuthContextType {
@@ -17,105 +27,174 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(false); // Changed: start as false, not true
+// Routes that run their own auth choreography. A session-expiry event must not
+// yank the user off these: the booking flow deliberately lets unauthenticated
+// users through Steps 1-2, /confirm-email is mid-verification and picks its own
+// destination, and the auth pages are already where an expired user belongs.
+const SELF_MANAGED_AUTH_ROUTES = [
+  '/book-road-test-vehicle',
+  '/confirm-email',
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/password-change',
+];
 
-  // Check if user is authenticated by calling the API.
-  // Returns the authoritative profile (or null) so callers can use the
-  // freshly fetched data without waiting for the `user` state to settle.
-  const checkAuthStatus = async (): Promise<UserProfile | null> => {
-    console.log('🔍 Checking authentication status...');
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const [user, setUser] = useState<UserProfile | null>(null);
+
+  // Starts true: on every page load we ask the backend who the user is before
+  // rendering a verdict. Consumers (Navbar, dashboards) already show a loading
+  // state, so this closes the window where a logged-in user is briefly shown
+  // the logged-out UI.
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Mirrors `user` for reads inside callbacks that must not re-subscribe on
+  // every user change (the session-expiry listener, in-flight request handlers).
+  const userRef = useRef<UserProfile | null>(null);
+  const inFlightCheck = useRef<Promise<UserProfile | null> | null>(null);
+  const hasBootstrapped = useRef(false);
+  const isRedirecting = useRef(false);
+
+  const applyUser = useCallback((nextUser: UserProfile | null) => {
+    userRef.current = nextUser;
+    setUser(nextUser);
+  }, []);
+
+  // Ask the backend who we are.
+  //
+  // Concurrent callers share one request: the provider bootstraps on mount and
+  // pages such as /dashboard also call this, and without de-duplication that is
+  // two /auth/customer/me round trips (each capable of triggering its own 401
+  // handling) for one page view.
+  const checkAuthStatus = useCallback(async (): Promise<UserProfile | null> => {
+    if (inFlightCheck.current) {
+      return inFlightCheck.current;
+    }
+
     setIsLoading(true);
 
-    try {
-      // Call the API to get current user
-      const result = await authApi.getCurrentUser();
+    const request = (async (): Promise<UserProfile | null> => {
+      try {
+        const result = await authApi.getCurrentUser();
 
-      if (result.success && result.data) {
-        console.log('✅ User authenticated:', {
-          id: result.data.id,
-          email: result.data.email,
-          name: result.data.full_name
-        });
-        setUser(result.data);
-        return result.data;
-      } else {
-        console.log('❌ User not authenticated');
-        setUser(null);
-        return null;
+        if (result.success && result.data) {
+          applyUser(result.data);
+          return result.data;
+        }
+
+        const status = result.error?.status_code ?? 0;
+
+        // Only a definitive rejection from the backend means "logged out".
+        // status_code 0 means the request never completed (offline, CORS,
+        // timeout) and 5xx means the backend is unwell — neither is evidence
+        // that the session ended. Treating them as a logout is why a transient
+        // blip used to eject users; we keep whatever session we already had.
+        if (status === 401 || status === 403) {
+          applyUser(null);
+          return null;
+        }
+
+        console.warn(
+          `Auth check inconclusive (status ${status}) — keeping the current session`
+        );
+        return userRef.current;
+      } catch (error) {
+        console.error('Auth check threw:', error);
+        return userRef.current;
+      } finally {
+        setIsLoading(false);
+        inFlightCheck.current = null;
       }
-    } catch (error) {
-      console.error('💥 Auth check failed:', error);
-      setUser(null);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    })();
+
+    inFlightCheck.current = request;
+    return request;
+  }, [applyUser]);
+
+  // Hydrate the session once per app load.
+  //
+  // Auth state lives in cookies on the API domain, but it used to live ONLY in
+  // this component's memory on the client — so a hard reload, a new tab, or a
+  // return trip from Stripe or an email link left the app rendering as though
+  // the user had been logged out, even with a perfectly valid session.
+  useEffect(() => {
+    if (hasBootstrapped.current) return;
+    hasBootstrapped.current = true;
+    checkAuthStatus();
+  }, [checkAuthStatus]);
+
+  // React to the axios layer reporting that a 401 survived a refresh attempt.
+  useEffect(() => {
+    return onSessionExpired(() => {
+      // Nothing to lose: an anonymous visitor on a public page 401s on the
+      // bootstrap call above, and that must never bounce them to /login.
+      if (!userRef.current) return;
+
+      applyUser(null);
+
+      if (isRedirecting.current) return;
+
+      const path = window.location.pathname;
+      if (SELF_MANAGED_AUTH_ROUTES.some((route) => path.startsWith(route))) return;
+
+      isRedirecting.current = true;
+      const returnTo = `${path}${window.location.search}`;
+      router.replace(
+        `/login?expired=true&redirect=${encodeURIComponent(returnTo)}`
+      );
+    });
+  }, [applyUser, router]);
 
   // Set user data after successful login
-  const login = (userData: UserProfile) => {
-    console.log('✅ Setting user data in context:', {
-      id: userData.id,
-      email: userData.email,
-      name: userData.full_name
-    });
-    setUser(userData);
-  };
+  const login = useCallback(
+    (userData: UserProfile) => {
+      applyUser(userData);
+      // A fresh session re-arms the expiry redirect for the next time.
+      isRedirecting.current = false;
+    },
+    [applyUser]
+  );
 
-  // Manually refresh authentication token
-  const refreshAuth = async (): Promise<boolean> => {
-    console.log('🔄 Manually refreshing authentication...');
-    setIsLoading(true);
+  // Manually renew the session.
+  //
+  // The refresh endpoint only rotates cookies; it returns no profile. So we
+  // refresh and then re-read /auth/customer/me. The previous version read
+  // `result.data` straight off the refresh response, found it empty, and
+  // concluded the user was logged out — a manual refresh logged you out.
+  const refreshAuth = useCallback(async (): Promise<boolean> => {
+    const result = await authApi.refreshToken();
 
-    try {
-      const result = await authApi.refreshToken();
-
-      if (result.success && result.data) {
-        console.log('✅ Auth refresh successful, updating user data');
-        setUser(result.data);
-        return true;
-      } else {
-        console.log('❌ Auth refresh failed');
-        setUser(null);
-        return false;
-      }
-    } catch (error) {
-      console.error('💥 Auth refresh error:', error);
-      setUser(null);
+    if (!result.success) {
+      applyUser(null);
       return false;
-    } finally {
-      setIsLoading(false);
     }
-  };
 
-  // Logout function
-  const logout = async (): Promise<void> => {
-    console.log('🚪 Starting logout process...');
+    const profile = await checkAuthStatus();
+    return !!profile;
+  }, [applyUser, checkAuthStatus]);
+
+  // Logout
+  const logout = useCallback(async (): Promise<void> => {
     setIsLoading(true);
 
     try {
-      // Call backend logout API
       await authApi.logout();
-      console.log('✅ Backend logout successful');
     } catch (error) {
-      console.error('❌ Backend logout error:', error);
-      // Continue with frontend logout even if backend fails
+      // Continue with the frontend logout even if the backend call fails.
+      console.error('Backend logout error:', error);
     } finally {
-      console.log('🧹 Clearing user data and redirecting...');
-      setUser(null);
+      applyUser(null);
       setIsLoading(false);
 
-      // Redirect to home page
+      // A full navigation rather than router.push: this is the one place where
+      // discarding every scrap of in-memory state is the point.
       if (typeof window !== 'undefined') {
         window.location.href = '/';
       }
     }
-  };
-
-  // Removed: useEffect that auto-checks auth on mount
-  // The auth check will only happen when explicitly called
+  }, [applyUser]);
 
   const value = {
     user,

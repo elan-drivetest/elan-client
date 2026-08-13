@@ -13,10 +13,10 @@ import { useBooking } from "@/lib/context/BookingContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { FileText, CreditCard } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { calculatePickupPricing } from "@/lib/utils/distance-calculator";
+import { addonsForTestType, findThirtyMinuteLesson } from "@/lib/pricing/calculate";
+import { formatPrice } from "@/lib/types/booking.types";
 import PickupOptions from "@/components/booking/PickupOptions";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 const bookingSteps = [
   { id: 1, name: "Road Test Details", path: "/book-road-test-vehicle/road-test-details" },
@@ -38,7 +38,8 @@ export default function TestDetails() {
     addons,
     isLoadingAddons,
     testCenters,
-    calculatePricing
+    calculatePricing,
+    pricingConfig
   } = useBooking();
   
   // File upload hooks
@@ -76,57 +77,23 @@ export default function TestDetails() {
     bookingState.documents?.licenseFile || null
   );
   
-  // Get mock test addon based on test type
-  const getMockTestAddon = () => {
-    if (!addons || addons.length === 0) return null;
-    
-    const testType = bookingState.testType;
-    if (!testType) return null;
-    
-    // Based on API response:
-    // - Mock Test Of G (id: 5) for G test
-    // - Mock Test Of G2 (id: 6) for G2 test
-    const mockTestAddon = addons.find(addon => {
-      const isMockTest = addon.name.toLowerCase().includes('mock test');
-      if (!isMockTest) return false;
-      
-      if (testType === 'G') {
-        return addon.name.toLowerCase().includes('of g') && !addon.name.toLowerCase().includes('g2');
-      } else if (testType === 'G2') {
-        return addon.name.toLowerCase().includes('of g2');
-      }
-      
-      return false;
-    });
-    
-    return mockTestAddon || null;
-  };
+  // Add-ons available for this booking's test type, filtered by `type` — the
+  // field the server keys off — rather than by matching words in the name.
+  const availableAddons = bookingState.testType
+    ? addonsForTestType(addons, bookingState.testType)
+    : [];
 
-  // Get driving lesson addon based on test type
-  const getDrivingLessonAddon = () => {
-    if (!addons || addons.length === 0) return null;
-    
-    const testType = bookingState.testType;
-    if (!testType) return null;
-    
-    // Get 1-hour lesson addon for the test type
-    const lessonAddon = addons.find(addon => {
-      const isLesson = addon.name.toLowerCase().includes('lesson') && 
-                     addon.name.toLowerCase().includes('1 hour');
-      if (!isLesson) return false;
-      
-      if (testType === 'G') {
-        return addon.name.toLowerCase().includes('of g') && !addon.name.toLowerCase().includes('g2');
-      } else if (testType === 'G2') {
-        return addon.name.toLowerCase().includes('of g2');
-      }
-      
-      return false;
-    });
-    
-    return lessonAddon || null;
-  };
-  
+  // The mock test for this test type. Both mock tests and lessons are seeded
+  // under LESSON_G / LESSON_G2, so the name is what separates them within a
+  // type; `duration: null` also distinguishes mock tests from lessons.
+  const getMockTestAddon = () =>
+    availableAddons.find(addon => addon.name.toLowerCase().startsWith('mock test')) ?? null;
+
+  // The 1-hour lesson for this test type.
+  const getDrivingLessonAddon = () =>
+    availableAddons.find(addon => addon.name.toLowerCase().startsWith('1 hour lesson')) ?? null;
+
+
   // Use ref to track pricing calculation
   const lastPricingStateRef = useRef<string>('');
 
@@ -137,14 +104,23 @@ export default function TestDetails() {
 
   // Recalculate pricing when relevant primitive values change
   useEffect(() => {
-    // Create a stable key from primitive values only
+    // Create a stable key from primitive values only.
+    //
+    // The fare tiers and the add-on catalogue are part of this key because both
+    // arrive asynchronously: GET /pricing-config resolves after the initial
+    // render (until then we're on the server's fallback tiers) and GET /addons
+    // is not fetched until Step 3. Without them the guard below would keep the
+    // first preview and never pick up the real config or the 30-minute lesson
+    // that the long-trip credit is derived from.
     const pricingKey = JSON.stringify({
       testCenterId: bookingState.testCenterId,
       pickupDistance: bookingState.pickupDistance,
       locationOption: bookingState.locationOption,
       selectedAddOn: bookingState.selectedAddOn,
       couponCode: bookingState.couponCode,
-      addonId: bookingState.selectedAddonData?.id
+      addonId: bookingState.selectedAddonData?.id,
+      pricingConfig,
+      addonCount: addons.length
     });
 
     // Only recalculate if the key has changed
@@ -161,6 +137,8 @@ export default function TestDetails() {
     bookingState.selectedAddOn,
     bookingState.couponCode,
     bookingState.selectedAddonData?.id,
+    pricingConfig,
+    addons,
     calculatePricing
   ]);
 
@@ -207,10 +185,9 @@ export default function TestDetails() {
     // Reset add-ons when changing location option
     if (option === 'test-centre') {
       setSelectedAddOn(null);
-      updateBookingState({ 
+      updateBookingState({
         selectedAddOn: null,
         selectedAddonData: null,
-        freeAddOn: null,
         pickupAddress: undefined,
         pickupDistance: undefined
       });
@@ -225,59 +202,17 @@ export default function TestDetails() {
       return;
     }
     
-    // Update booking state with the new pickup information
-    updateBookingState({ 
+    // Record the pickup. Pricing is derived from this by the effect below, via
+    // the shared engine in lib/pricing — this handler no longer computes money.
+    updateBookingState({
       pickupAddress: address,
       pickupCoordinates: coordinates,
       pickupDistance: distance
     });
-    
-    // Calculate pickup price based on distance
-    const pickupPricingResult = calculatePickupPricing(distance);
-    const pickupPriceInCents = pickupPricingResult.pickup_price;
-    
-    console.log('💰 Calculated pickup pricing:', {
-      distance,
-      pickupPriceInCents,
-      freeBenefits: pickupPricingResult.free_benefits
-    });
-    
-    // Update booking state with pickup price
-    updateBookingState({
-      pricing: {
-        basePrice: bookingState.pricing?.basePrice || 80.00,
-        pickupPrice: pickupPriceInCents / 100, // Convert cents to dollars
-        addOnPrice: bookingState.pricing?.addOnPrice || 0,
-        discounts: bookingState.pricing?.discounts || 0,
-        total: (bookingState.pricing?.basePrice || 80.00) + (pickupPriceInCents / 100)
-      }
-    });
-    
-    // Check if eligible for free add-ons based on distance
-    if (distance >= 100) {
-      console.log('🎉 Eligible for free 1-hour lesson');
-      updateBookingState({ freeAddOn: 'one-hour-lesson' });
-    } else if (distance >= 50) {
-      console.log('🎉 Eligible for free 30-min lesson');
-      updateBookingState({ freeAddOn: 'thirty-min-lesson' });
-    } else {
-      console.log('❌ Not eligible for free lessons');
-      updateBookingState({ freeAddOn: null });
-    }
   };
-  
-  // FIXED: handleSelectAddOn with proper mutual exclusion
+
   const handleSelectAddOn = (type: AddOnType) => {
-    console.log('🎯 Add-on selection:', { type, currentSelection: selectedAddOn, freeAddOn: bookingState.freeAddOn });
-    
-    // Check if there's a free add-on and prevent selecting paid version of same service
-    if (bookingState.freeAddOn === 'one-hour-lesson' && type === 'driving-lesson') {
-      // Don't allow selection if already getting a free 1-hour lesson
-      alert("You already qualify for a free 1-hour driving lesson!");
-      return;
-    }
-    
-    // FIXED: Toggle logic - if same type is selected, deselect it, otherwise select new type
+    // Toggle: selecting the current add-on again clears it.
     const newAddOn = type === selectedAddOn ? null : type;
     
     console.log('✅ Setting new add-on:', newAddOn);
@@ -383,10 +318,17 @@ export default function TestDetails() {
     ? `${bookingState.testDate} at ${bookingState.testTime}`
     : "Monday, April 7, 2025 at 10:00 am";
 
-  // Helper function to check free add-on type
-  const hasFreeOneHourLesson = bookingState.freeAddOn === 'one-hour-lesson';
-  const hasFreeThirtyMinLesson = bookingState.freeAddOn === 'thirty-min-lesson';
-  
+  // Long-trip credit eligibility, derived entirely from server data: the
+  // threshold from GET /pricing-config and the credited lesson from GET /addons.
+  // Mirrors the server's `distance > baseDistance` (strict) comparison.
+  const thirtyMinuteLesson = bookingState.testType
+    ? findThirtyMinuteLesson(addons, bookingState.testType)
+    : null;
+  const pickupDistanceKm =
+    locationOption === 'pickup' ? (bookingState.pickupDistance ?? 0) : 0;
+  const qualifiesForLongTripCredit =
+    pickupDistanceKm > pricingConfig.baseDistance && !!thirtyMinuteLesson;
+
   // Get display values for TestSummary
   const displayTestCentre = typeof bookingState.testCenter === 'string' 
     ? bookingState.testCenter 
@@ -409,7 +351,79 @@ export default function TestDetails() {
             phone={userData.phone}
           />
           
-          {/* Document Uploads */}
+          {/* Location Selection */}
+          <LocationSelection
+            selectedOption={locationOption}
+            onOptionChange={handleLocationChange}
+            onPickupLocationSelect={handlePickupLocationSelect}
+            testCenterCoordinates={
+              testCenters.length > 0 && bookingState.testCenter
+                ? testCenters.find(c => 
+                    c.id === bookingState.testCenterId || 
+                    c.name === (typeof bookingState.testCenter === 'string' ? bookingState.testCenter : bookingState.testCenter?.name)
+                  ) 
+                  ? { 
+                      lat: testCenters.find(c => 
+                        c.id === bookingState.testCenterId || 
+                        c.name === (typeof bookingState.testCenter === 'string' ? bookingState.testCenter : bookingState.testCenter?.name)
+                      )!.lat, 
+                      lng: testCenters.find(c => 
+                        c.id === bookingState.testCenterId || 
+                        c.name === (typeof bookingState.testCenter === 'string' ? bookingState.testCenter : bookingState.testCenter?.name)
+                      )!.lng 
+                    }
+                  : undefined
+                : undefined
+            }
+          />
+
+          <Separator className="mb-8" />
+          
+          {/* Long-trip credit.
+              The server credits the price of the matching 30-minute lesson off
+              any add-on when the pickup is beyond base_distance. Both the
+              threshold and the credit amount come from the server — the tiers
+              from GET /pricing-config and the lesson price from GET /addons —
+              so this copy cannot drift from what is actually charged. */}
+          {qualifiesForLongTripCredit && (
+            <div className="mb-8 bg-green-50 border border-green-200 rounded-md p-4">
+              <h3 className="font-medium text-[#0C8B44] mb-1">
+                Long-trip credit: {formatPrice(thirtyMinuteLesson!.price)} off any add-on
+              </h3>
+              <p className="text-sm text-gray-700">
+                {selectedAddOn
+                  ? `Your pickup is ${pickupDistanceKm.toFixed(1)} km, past the ${pricingConfig.baseDistance} km mark, so we've taken ${formatPrice(thirtyMinuteLesson!.price)} off your add-on.`
+                  : `Your pickup is ${pickupDistanceKm.toFixed(1)} km, past the ${pricingConfig.baseDistance} km mark. Add a lesson or mock test below and we'll take ${formatPrice(thirtyMinuteLesson!.price)} off it.`}
+              </p>
+            </div>
+          )}
+
+          {/* Add-ons. Mutually exclusive — picking one replaces the other, and
+              picking the current one clears it. */}
+          <div className="mb-8">
+            <MockTestCard
+              isAdded={selectedAddOn === 'mock-test'}
+              onAdd={() => handleSelectAddOn('mock-test')}
+              testType={bookingState.testType || undefined}
+              addon={getMockTestAddon()}
+              isLoading={isLoadingAddons}
+            />
+          </div>
+
+          <div className="mb-8">
+            <DrivingLessonCard
+              duration="1 hour"
+              description="One-on-one practice session with a professional instructor before your test"
+              isSelected={selectedAddOn === 'driving-lesson'}
+              onSelect={() => handleSelectAddOn('driving-lesson')}
+            />
+          </div>
+
+          
+          {/* Document Uploads.
+              Deliberately below the pickup / meet-at-centre choice and the
+              add-ons: those drive pricing and are the decisions users come to
+              this step to make, so they lead. */}
           <div className="mb-8">
             <DocumentUpload
               title="Upload Your G2/G Road Test Booking Confirmation"
@@ -445,198 +459,12 @@ export default function TestDetails() {
               } : undefined}
             />
           </div>
-          
-          {/* Location Selection */}
-          <LocationSelection
-            selectedOption={locationOption}
-            onOptionChange={handleLocationChange}
-            onPickupLocationSelect={handlePickupLocationSelect}
-            testCenterCoordinates={
-              testCenters.length > 0 && bookingState.testCenter
-                ? testCenters.find(c => 
-                    c.id === bookingState.testCenterId || 
-                    c.name === (typeof bookingState.testCenter === 'string' ? bookingState.testCenter : bookingState.testCenter?.name)
-                  ) 
-                  ? { 
-                      lat: testCenters.find(c => 
-                        c.id === bookingState.testCenterId || 
-                        c.name === (typeof bookingState.testCenter === 'string' ? bookingState.testCenter : bookingState.testCenter?.name)
-                      )!.lat, 
-                      lng: testCenters.find(c => 
-                        c.id === bookingState.testCenterId || 
-                        c.name === (typeof bookingState.testCenter === 'string' ? bookingState.testCenter : bookingState.testCenter?.name)
-                      )!.lng 
-                    }
-                  : undefined
-                : undefined
-            }
-          />
 
           <Separator className="mb-8" />
-          
-          {/* FIXED: Add-on Selection Logic with Proper Mutual Exclusion */}
-          
-          {/* Case 1: User has free 1-hour lesson and has NOT selected any paid upgrade */}
-          {hasFreeOneHourLesson && !selectedAddOn && (
-            <div className="mb-8 bg-green-50 border border-green-200 rounded-md p-4">
-              <h3 className="font-medium text-[#0C8B44] mb-2">🎉 Free 1-hour Driving Lesson</h3>
-              <p className="text-sm text-gray-700 mb-3">
-                Congratulations! You qualify for a free 1-hour driving lesson before your test due to your pickup distance.
-              </p>
-              
-              <DrivingLessonCard
-                duration="1 hour"
-                description="One-on-one practice session with a professional instructor before your test"
-                isSelected={true}
-                onSelect={() => {}}
-              />
-              
-              <div className="mt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Upgrade Options:</p>
-                <button 
-                  onClick={() => handleSelectAddOn('mock-test')}
-                  className="block w-full text-left p-3 border border-gray-300 rounded-md text-sm hover:border-[#0C8B44] hover:bg-green-50 transition-colors"
-                >
-                  <span className="font-medium">Upgrade to mock test</span>
-                  <span className="text-xs text-gray-600 block mt-1">
-                    Pay only $4.99 more for a complete mock test (Upgrade from free 1-hour lesson)
-                  </span>
-                </button>
-              </div>
-            </div>
-          )}
-          
-          {/* Case 2: User has free 1-hour lesson and has selected mock test upgrade */}
-          {hasFreeOneHourLesson && selectedAddOn === 'mock-test' && (
-            <div className="mb-8">
-              <MockTestCard 
-                isAdded={true} 
-                onAdd={() => handleSelectAddOn(null)}
-                testType={bookingState.testType as any}
-                addon={getMockTestAddon()}
-                isLoading={isLoadingAddons}
-              />
-            </div>
-          )}
-          
-          {/* Case 3: User has free 30-min lesson and has NOT selected any paid upgrade */}
-          {hasFreeThirtyMinLesson && !selectedAddOn && (
-            <div className="mb-8 bg-green-50 border border-green-200 rounded-md p-4">
-              <h3 className="font-medium text-[#0C8B44] mb-2">🎉 Free 30-minute Driving Lesson</h3>
-              <p className="text-sm text-gray-700 mb-3">
-                You qualify for a free 30-minute driving lesson before your test due to your pickup distance.
-              </p>
-              
-              <div className="mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Upgrade Options:</p>
-                
-                <div className="space-y-2">
-                  <button 
-                    onClick={() => handleSelectAddOn('driving-lesson')}
-                    className="block w-full text-left p-3 border border-gray-300 rounded-md text-sm hover:border-[#0C8B44] hover:bg-green-50"
-                  >
-                    <span className="font-medium">Upgrade to 1-hour lesson</span>
-                    <span className="text-xs text-gray-600 block mt-1">
-                      Pay only $25 more for a full hour (Regular price: $50)
-                    </span>
-                  </button>
-                  
-                  <button 
-                    onClick={() => handleSelectAddOn('mock-test')}
-                    className="block w-full text-left p-3 border border-gray-300 rounded-md text-sm hover:border-[#0C8B44] hover:bg-green-50"
-                  >
-                    <span className="font-medium">Upgrade to mock test</span>
-                    <span className="text-xs text-gray-600 block mt-1">
-                      Pay only $29.99 more for a complete mock test (Regular price: $54.99)
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Case 4: User has free 30-min lesson and has selected 1-hour lesson upgrade */}
-          {hasFreeThirtyMinLesson && selectedAddOn === 'driving-lesson' && (
-            <div className="mb-8">
-              <DrivingLessonCard
-                duration="1 hour"
-                description="One-on-one practice session with a professional instructor before your test"
-                isSelected={true}
-                onSelect={() => handleSelectAddOn(null)}
-              />
-            </div>
-          )}
-          
-          {/* Case 5: User has free 30-min lesson and has selected mock test upgrade */}
-          {hasFreeThirtyMinLesson && selectedAddOn === 'mock-test' && (
-            <div className="mb-8">
-              <MockTestCard 
-                isAdded={true} 
-                onAdd={() => handleSelectAddOn(null)}
-                testType={bookingState.testType as any}
-                addon={getMockTestAddon()}
-                isLoading={isLoadingAddons}
-              />
-            </div>
-          )}
-          
-          {/* Case 6: User has NO free lessons - show standard add-on options */}
-          {!hasFreeOneHourLesson && !hasFreeThirtyMinLesson && (
-            <>
-              {/* Show mock test if not selected */}
-              {selectedAddOn !== "mock-test" && (
-                <div className="mb-8">
-                  <MockTestCard 
-                    onAdd={() => handleSelectAddOn('mock-test')}
-                    testType={bookingState.testType as any}
-                    addon={getMockTestAddon()}
-                    isLoading={isLoadingAddons}
-                  />
-                </div>
-              )}
-              
-              {/* Show mock test confirmation if selected */}
-              {selectedAddOn === 'mock-test' && (
-                <div className="mb-8">
-                  <MockTestCard 
-                    isAdded={true} 
-                    onAdd={() => handleSelectAddOn(null)}
-                    testType={bookingState.testType as any}
-                    addon={getMockTestAddon()}
-                    isLoading={isLoadingAddons}
-                  />
-                </div>
-              )}
-              
-              {/* Show driving lesson if not selected */}
-              {selectedAddOn !== "driving-lesson" && (
-                <div className="mb-8">
-                  <DrivingLessonCard
-                    duration="1 hour"
-                    description="One-on-one practice session with a professional instructor before your test"
-                    isSelected={false}
-                    onSelect={() => handleSelectAddOn('driving-lesson')}
-                  />
-                </div>
-              )}
-              
-              {/* Show driving lesson confirmation if selected */}
-              {selectedAddOn === 'driving-lesson' && (
-                <div className="mb-8">
-                  <DrivingLessonCard
-                    duration="1 hour"
-                    description="One-on-one practice session with a professional instructor before your test"
-                    isSelected={true}
-                    onSelect={() => handleSelectAddOn(null)}
-                  />
-                </div>
-              )}
-            </>
-          )}
-          
+
           {/* Bottom Additional Benefits */}
           <PickupOptions />
-          
+
           {/* Continue Button */}
           <div className="mb-8">
             <button

@@ -304,48 +304,9 @@ const deg2rad = (deg: number): number => {
   return deg * (Math.PI/180);
 };
 
-/**
- * Calculate pickup pricing based on distance
- */
-export const calculatePickupPrice = (distanceKm: number): number => {
-  if (distanceKm <= 0) return 0;
-  
-  if (distanceKm <= 50) {
-    // $1 per km for first 50km
-    return Math.round(distanceKm * 100); // in cents
-  } else {
-    // $1 per km for first 50km + $0.50 per km for additional distance
-    const first50km = 50 * 100; // $50 in cents
-    const additionalDistance = distanceKm - 50;
-    const additionalCost = Math.round(additionalDistance * 50); // $0.50 per km in cents
-    return first50km + additionalCost;
-  }
-};
-
-/**
- * Check if distance qualifies for free perks
- */
-export const getDistancePerks = (distanceKm: number): {
-  freeDropoff: boolean;
-  freeDrivingLesson: '30min' | '1hour' | null;
-} => {
-  if (distanceKm > 100) {
-    return {
-      freeDropoff: true,
-      freeDrivingLesson: '1hour'
-    };
-  } else if (distanceKm > 50) {
-    return {
-      freeDropoff: true,
-      freeDrivingLesson: '30min'
-    };
-  } else {
-    return {
-      freeDropoff: false,
-      freeDrivingLesson: null
-    };
-  }
-};
+// Pickup pricing and "distance perks" used to live here as a third copy of the
+// fare tiers plus a free-lesson model the backend never had. Pricing now lives
+// only in lib/pricing/, driven by GET /pricing-config and GET /addons.
 
 // ============================================================================
 // ADDON UTILITIES
@@ -428,9 +389,7 @@ export const bookingUtils = {
   
   // Distance utilities - ENHANCED WITH BACKEND API
   calculateDistance,
-  calculatePickupPrice,
-  getDistancePerks,
-  
+
   // Addon utilities
   getAddonsForTestType,
   formatAddonDuration
