@@ -326,8 +326,11 @@ export default function TestDetails() {
     : null;
   const pickupDistanceKm =
     locationOption === 'pickup' ? (bookingState.pickupDistance ?? 0) : 0;
+  // Needs the live threshold; without it we make no claim about a credit.
   const qualifiesForLongTripCredit =
-    pickupDistanceKm > pricingConfig.baseDistance && !!thirtyMinuteLesson;
+    !!pricingConfig &&
+    pickupDistanceKm > pricingConfig.baseDistance &&
+    !!thirtyMinuteLesson;
 
   // Get display values for TestSummary
   const displayTestCentre = typeof bookingState.testCenter === 'string' 
@@ -392,8 +395,8 @@ export default function TestDetails() {
               </h3>
               <p className="text-sm text-gray-700">
                 {selectedAddOn
-                  ? `Your pickup is ${pickupDistanceKm.toFixed(1)} km, past the ${pricingConfig.baseDistance} km mark, so we've taken ${formatPrice(thirtyMinuteLesson!.price)} off your add-on.`
-                  : `Your pickup is ${pickupDistanceKm.toFixed(1)} km, past the ${pricingConfig.baseDistance} km mark. Add a lesson or mock test below and we'll take ${formatPrice(thirtyMinuteLesson!.price)} off it.`}
+                  ? `Your pickup is ${pickupDistanceKm.toFixed(1)} km, past the ${pricingConfig!.baseDistance} km mark, so we've taken ${formatPrice(thirtyMinuteLesson!.price)} off your add-on.`
+                  : `Your pickup is ${pickupDistanceKm.toFixed(1)} km, past the ${pricingConfig!.baseDistance} km mark. Add a lesson or mock test below and we'll take ${formatPrice(thirtyMinuteLesson!.price)} off it.`}
               </p>
             </div>
           )}

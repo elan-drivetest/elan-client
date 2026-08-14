@@ -5,6 +5,7 @@ import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { AuthProvider } from "@/lib/context/AuthContext";
+import { ConfigProvider } from "@/lib/context/ConfigContext";
 
 // Configure IBM Plex Sans JP font
 const ibmPlexSansJP = IBM_Plex_Sans_JP({
@@ -35,11 +36,13 @@ export default function RootLayout({
         className={`${ibmPlexSansJP.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <AuthProvider>
-          <Navbar />
-          {children}
-          <Footer />
-        </AuthProvider>
+        <ConfigProvider>
+          <AuthProvider>
+            <Navbar />
+            {children}
+            <Footer />
+          </AuthProvider>
+        </ConfigProvider>
       </body>
     </html>
   );

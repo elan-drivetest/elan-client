@@ -547,15 +547,20 @@ export default function LocationSelection({
             </div>
           )}
 
-          {/* Distance and Pricing Info */}
+          {/* Distance and Pricing Info. The fee is shown only once the live fare
+              tiers have loaded — quoting one from built-in constants is how a
+              120 km pickup once previewed at $85 instead of $250. */}
           {pickupDistance !== undefined && (
             <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <h4 className="text-sm font-medium text-blue-900 mb-2">Distance & Pricing</h4>
               <div className="space-y-1 text-sm text-blue-800">
                 <p>• Distance to test center: {pickupDistance?.toFixed(1) || '0'} km</p>
-                {/* Uses the shared engine and the server's live fare tiers —
-                    this used to re-implement the formula inline, in dollars. */}
-                <p>• Pickup fee: {formatPrice(previewPickupPrice(pickupDistance || 0, pricingConfig))}</p>
+                <p>
+                  • Pickup fee:{' '}
+                  {pricingConfig
+                    ? formatPrice(previewPickupPrice(pickupDistance || 0, pricingConfig))
+                    : 'calculating…'}
+                </p>
               </div>
             </div>
           )}
@@ -563,7 +568,8 @@ export default function LocationSelection({
           {/* Long-trip credit. The threshold is the server's base_distance and
               the amount is the real 30-minute lesson price, so this cannot
               promise a benefit the backend does not grant. */}
-          {pickupDistance !== undefined &&
+          {pricingConfig &&
+            pickupDistance !== undefined &&
             pickupDistance > pricingConfig.baseDistance &&
             thirtyMinuteLesson && (
             <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-4">
@@ -586,11 +592,13 @@ export default function LocationSelection({
           {/* Helper Text */}
           <div className="mt-3 text-xs text-gray-500">
             <p>💡 Tip: Include your postal code for better accuracy</p>
-            <p>
-              • Distance-based pricing: first {pricingConfig.baseDistance} km at{' '}
-              {formatPrice(pricingConfig.baseRate)}/km, then{' '}
-              {formatPrice(pricingConfig.normalRate)}/km
-            </p>
+            {pricingConfig && (
+              <p>
+                • Distance-based pricing: first {pricingConfig.baseDistance} km at{' '}
+                {formatPrice(pricingConfig.baseRate)}/km, then{' '}
+                {formatPrice(pricingConfig.normalRate)}/km
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -601,27 +609,29 @@ export default function LocationSelection({
           <div className="flex items-start gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div>
-              <h4 className="font-medium text-sm text-amber-800">Unlock Premium Benefits!</h4>
+              <h4 className="font-medium text-sm text-amber-800">Prefer to be picked up?</h4>
               <p className="text-xs text-amber-700 mt-1">
-                By selecting our pickup service instead of meeting at the test center, you can enjoy:
+                We&apos;ll collect you from your address and bring you to the test
+                centre.
               </p>
             </div>
           </div>
-          
-          <ul className="mt-3 ml-7 space-y-1">
-            <li className="flex items-center gap-1 text-xs text-amber-700">
-              <Check size={14} className="text-[#0C8B44]" />
-              <span>Free dropoff for distances over 50km</span>
-            </li>
-            <li className="flex items-center gap-1 text-xs text-amber-700">
-              <Check size={14} className="text-[#0C8B44]" />
-              <span>Free 30-minute driving lesson for distances over 50km</span>
-            </li>
-            <li className="flex items-center gap-1 text-xs text-amber-700">
-              <Check size={14} className="text-[#0C8B44]" />
-              <span>Free 1-hour driving lesson for distances over 100km</span>
-            </li>
-          </ul>
+
+          {/* This block used to advertise a free dropoff and free 30-minute /
+              1-hour lessons at 50 km and 100 km. None of that exists on the
+              server — the only long-distance benefit is the credit below, whose
+              threshold and amount both come from live config. */}
+          {pricingConfig && thirtyMinuteLesson && (
+            <ul className="mt-3 ml-7 space-y-1">
+              <li className="flex items-center gap-1 text-xs text-amber-700">
+                <Check size={14} className="text-[#0C8B44]" />
+                <span>
+                  Pickups past {pricingConfig.baseDistance} km earn{' '}
+                  {formatPrice(thirtyMinuteLesson.price)} off any lesson or mock test
+                </span>
+              </li>
+            </ul>
+          )}
         </div>
       )}
     </div>

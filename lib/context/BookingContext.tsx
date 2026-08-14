@@ -10,11 +10,8 @@ import {
   previewBookingPrice,
   type BookingPricePreview,
 } from '@/lib/pricing/calculate';
-import {
-  getPricingConfig,
-  PRICING_CONFIG_FALLBACK,
-  type PricingConfig,
-} from '@/lib/pricing/config';
+import { useAppConfig } from '@/lib/context/ConfigContext';
+import type { PickupPricingConfig } from '@/lib/config/app-config';
 import type {
   DriveTestCenter,
   Addon,
@@ -97,8 +94,11 @@ interface BookingContextType {
   isLoadingCenters: boolean;
   isLoadingAddons: boolean;
 
-  /** Pickup fare tiers from GET /pricing-config. Never hardcode these. */
-  pricingConfig: PricingConfig;
+  /**
+   * Pickup fare tiers from GET /pricing-config. Null while loading or if the
+   * fetch failed — in which case no price may be shown. Never hardcode these.
+   */
+  pricingConfig: PickupPricingConfig | null;
 
   // Refetch method - call after authentication
   refetchBookingData: () => void;
@@ -138,24 +138,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const { addons, loading: isLoadingAddons, refetch: refetchAddons } = useAddons(undefined, false);
   const { createBooking: apiCreateBooking } = useBookingCreation();
 
-  // Pickup fare tiers, served by the backend. Starts on the same fallback the
-  // server itself uses so the first render has something sane, then swaps to
-  // the live values. Fetched once per provider mount.
-  const [pricingConfig, setPricingConfig] = useState<PricingConfig>(
-    PRICING_CONFIG_FALLBACK
-  );
-
-  useEffect(() => {
-    let active = true;
-
-    getPricingConfig().then((config) => {
-      if (active) setPricingConfig(config);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  // Pickup fare tiers, from the app-wide config provider. Null until it loads,
+  // and if it fails — pricing is deliberately not computed from constants.
+  const { config: appConfig } = useAppConfig();
+  const pricingConfig: PickupPricingConfig | null = appConfig;
 
   // Method to refetch all booking data (call after authentication or on Step 3)
   const refetchBookingData = useCallback(() => {
@@ -233,7 +219,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const calculatePricing = useCallback(() => {
     const { testCenter, pickupDistance, locationOption, selectedAddonData, testType } = bookingState;
 
-    if (!testCenter) return;
+    // No centre, or no fare tiers yet: leave pricePreview undefined so the UI
+    // shows a placeholder. Computing from fallback constants here is what made
+    // a 120 km pickup quote $85 instead of $250.
+    if (!testCenter || !pricingConfig) return;
 
     try {
       const meetAtCenter = locationOption === 'test-centre';
@@ -277,29 +266,24 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     }
 
     // Format datetime for API: "YYYY-MM-DD HH:mm:ss"
-    // const formattedDateTime = `${testDate} ${testTime}:00`;
-const formattedDateTime = (() => {
-  // Create a proper datetime by combining date and time
-  const dateTimeString = `${testDate}T${testTime}:00`;
-  const dateObj = new Date(dateTimeString);
-  
-  // Validate the date is at least 2 days from now
-  const now = new Date();
-  const twoDaysFromNow = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
-  
-  if (dateObj < twoDaysFromNow) {
-    throw new Error('Test date must be at least 2 days from today');
-  }
-  
-  // Format as YYYY-MM-DD HH:mm:ss for API
-  const year = dateObj.getFullYear();
-  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const day = String(dateObj.getDate()).padStart(2, '0');
-  const hours = String(dateObj.getHours()).padStart(2, '0');
-  const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-  
-  return `${year}-${month}-${day} ${hours}:${minutes}:00`;
-})();
+    //
+    // Deliberately no lead-time check here. `booking_min_lead_days` is an
+    // admin-tunable server setting, and the server's own error interpolates the
+    // live value ("Test date must be greater than N days"). Throwing our own
+    // sentence pre-empted that message and would state the wrong number the
+    // moment an admin changed the setting. The date picker still hints at the
+    // window before submit; the server is the authority.
+    const formattedDateTime = (() => {
+      const dateObj = new Date(`${testDate}T${testTime}:00`);
+
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const hours = String(dateObj.getHours()).padStart(2, '0');
+      const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+
+      return `${year}-${month}-${day} ${hours}:${minutes}:00`;
+    })();
     const meetAtCenter = locationOption === 'test-centre';
 
     return {

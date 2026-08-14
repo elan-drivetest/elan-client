@@ -4,6 +4,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { FileText, Mail, Phone } from "lucide-react";
+import { fetchAppConfigOnServer, type AppConfig } from "@/lib/config/app-config";
+import { formatPrice } from "@/lib/types/booking.types";
+import { describeRefundLadder, getRefundLadder } from "@/lib/utils/refund-policy";
 
 export const metadata: Metadata = {
   title: "Terms of Service | Elan Road Test Rental",
@@ -13,7 +16,20 @@ export const metadata: Metadata = {
 
 const LAST_UPDATED = "May 1, 2026";
 
-const sections: { id: string; title: string; body: React.ReactNode }[] = [
+/**
+ * Sections are built per-request because two of them state numbers the admin can
+ * change without a deploy: the minimum booking notice and the refund ladder.
+ * Both are resolved from the server and degrade to number-free wording when the
+ * config is unavailable — a Terms page that states the wrong refund window is
+ * worse than one that points at the policy.
+ */
+const buildSections = (
+  config: AppConfig | null
+): { id: string; title: string; body: React.ReactNode }[] => {
+  const refundLadder = getRefundLadder(config);
+  const minLeadDays = config?.bookingMinLeadDays ?? null;
+
+  return [
   {
     id: "acceptance",
     title: "Acceptance of Terms",
@@ -44,8 +60,20 @@ const sections: { id: string; title: string; body: React.ReactNode }[] = [
           and a valid road test confirmation issued by DriveTest Ontario.
         </p>
         <p>
-          Bookings must be made at least <strong>2 days in advance</strong> of your
-          scheduled DriveTest appointment. We reserve the right to refuse or cancel
+          {minLeadDays === null ? (
+            <>Bookings are subject to the minimum notice shown at checkout.</>
+          ) : minLeadDays === 0 ? (
+            <>Bookings may be made for the same day, subject to availability.</>
+          ) : (
+            <>
+              Bookings must be made at least{" "}
+              <strong>
+                {minLeadDays} day{minLeadDays === 1 ? "" : "s"} in advance
+              </strong>{" "}
+              of your scheduled DriveTest appointment.
+            </>
+          )}{" "}
+          We reserve the right to refuse or cancel
           a booking if your documents are incomplete, the booking conflicts with
           another reservation, or the requested time falls outside our service
           hours.
@@ -63,11 +91,23 @@ const sections: { id: string; title: string; body: React.ReactNode }[] = [
           at least <strong>15 minutes</strong> before the scheduled pickup time. Pickup
           pricing is calculated based on distance from the selected DriveTest centre:
         </p>
-        <ul className="list-disc pl-6 space-y-1">
-          <li>$2.00 per kilometre for the first 50&nbsp;km</li>
-          <li>$1.00 per kilometre beyond 50&nbsp;km</li>
-          <li>Complimentary drop-off applies to qualifying distances</li>
-        </ul>
+        {config ? (
+          <ul className="list-disc pl-6 space-y-1">
+            <li>
+              {formatPrice(config.baseRate)} per kilometre for the first{" "}
+              {config.baseDistance}&nbsp;km
+            </li>
+            <li>
+              {formatPrice(config.normalRate)} per kilometre beyond{" "}
+              {config.baseDistance}&nbsp;km
+            </li>
+          </ul>
+        ) : (
+          <p>
+            Current per-kilometre rates are shown on the booking summary before
+            you pay.
+          </p>
+        )}
         <p>
           Distance is measured by our routing engine; the calculation displayed
           at checkout is final for that booking.
@@ -85,12 +125,20 @@ const sections: { id: string; title: string; body: React.ReactNode }[] = [
           payment you authorize Elan to charge the full amount shown on the
           checkout summary, including any selected add-ons.
         </p>
+        {refundLadder ? (
+          <ul className="list-disc pl-6 space-y-1">
+            {describeRefundLadder(refundLadder).map((band) => (
+              <li key={band.window}>
+                <strong>{band.window}:</strong> {band.outcome}
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <p>
-          Cancellation requests submitted at least <strong>48 hours</strong> before
-          your scheduled test are eligible for a full refund. Cancellations made
-          within 48 hours of the test may be subject to a service fee. No refund
-          is issued for no-shows or for tests cancelled by DriveTest Ontario due
-          to incomplete documentation on the part of the customer.
+          No refund is issued for no-shows or for tests cancelled by DriveTest
+          Ontario due to incomplete documentation on the part of the customer.
+          The refund amount applicable to your request is confirmed at the time
+          you submit it.
         </p>
       </>
     ),
@@ -180,10 +228,16 @@ const sections: { id: string; title: string; body: React.ReactNode }[] = [
         </p>
       </>
     ),
-  },
-];
+    },
+  ];
+};
 
-export default function TermsPage() {
+export default async function TermsPage() {
+  // Server-fetched so the numbers are in the HTML for SEO and still follow the
+  // admin's settings, refreshing within the revalidate window.
+  const config = await fetchAppConfigOnServer();
+  const sections = buildSections(config);
+
   return (
     <main className="bg-white">
       {/* Hero */}

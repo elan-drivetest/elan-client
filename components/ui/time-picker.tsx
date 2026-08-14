@@ -407,7 +407,7 @@ export function TimePicker({
             <p className="text-sm text-gray-500">Scroll or tap to select</p>
             {minDateTime && (
               <p className="text-xs text-amber-600 mt-2 font-medium">
-                Must be at least 48 hours from now
+                Earliest available: {format(minDateTime, "MMM d, h:mm a")}
               </p>
             )}
           </div>

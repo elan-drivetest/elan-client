@@ -14,7 +14,15 @@ interface DatePickerProps {
   className?: string;
   disabled?: boolean;
   unavailableDates?: Date[]; // Array of unavailable dates
-  minDaysFromToday?: number; // Minimum days from today (default: 2)
+  /**
+   * Minimum days from today.
+   *
+   * Required on purpose. The booking flow must pass the server's live
+   * `booking_min_lead_days` (via useAppConfig) — a default here would silently
+   * reintroduce a hardcoded window, which is exactly how the picker ended up
+   * blocking same-day bookings while the server allowed them.
+   */
+  minDaysFromToday: number;
   maxDate?: Date; // Maximum selectable date (optional)
 }
 
@@ -24,7 +32,7 @@ export function DatePicker({
   className, 
   disabled = false,
   unavailableDates = [],
-  minDaysFromToday = 2,
+  minDaysFromToday,
   maxDate
 }: DatePickerProps) {
   

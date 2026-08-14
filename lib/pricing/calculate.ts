@@ -16,7 +16,7 @@
 // against a markdown file.
 
 import { AddonType, type Addon, type TestType } from '@/lib/types/booking.types';
-import type { PricingConfig } from './config';
+import type { PickupPricingConfig } from '@/lib/config/app-config';
 
 // ---------------------------------------------------------------------------
 // Add-on lookup — mirrors bookings.service.ts
@@ -84,7 +84,7 @@ export function findThirtyMinuteLesson(
  */
 export function previewPickupPrice(
   distanceKm: number,
-  config: PricingConfig
+  config: PickupPricingConfig
 ): number {
   if (distanceKm <= 0) {
     return 0;
@@ -131,7 +131,7 @@ export interface BookingPricePreview {
  * any point.
  */
 export function previewBookingPrice(args: {
-  config: PricingConfig;
+  config: PickupPricingConfig;
   /** Selected test centre's `base_price`, in cents, from GET /drive-test-centers. */
   centerBasePrice: number;
   /** Driving distance from GET-backed /bookings/calculate-distance, in km. */

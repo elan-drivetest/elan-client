@@ -19,17 +19,11 @@ export interface DistanceCalculationResponse {
     pickup: Coordinates;
     test_center: Coordinates;
   };
-  distance_breakdown?: {
-    first_50km: number;
-    beyond_50km: number;
-    first_50km_cost: number;
-    beyond_50km_cost: number;
-  };
-  free_benefits?: {
-    free_dropoff: boolean;
-    free_30min_lesson: boolean;
-    free_1hr_lesson: boolean;
-  };
+  // `distance_breakdown` (first_50km / beyond_50km) and `free_benefits`
+  // (free_dropoff / free_30min_lesson / free_1hr_lesson) used to be declared
+  // here. The server sends neither: the 50 km tier names baked in a threshold
+  // that is now admin-tunable, and the free-benefit flags described a model the
+  // backend has never had. Both were unused. Do not reintroduce them.
 }
 
 // ============================================================================

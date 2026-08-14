@@ -15,6 +15,8 @@ import { useRouter } from "next/navigation";
 import { bookingApi } from "@/lib/api";
 import { useRefundRequest } from "@/lib/hooks/useBooking";
 import { deriveBookingAdjustment } from "@/lib/pricing/calculate";
+import { useAppConfig } from "@/lib/context/ConfigContext";
+import { describeRefundLadder, getRefundLadder } from "@/lib/utils/refund-policy";
 import type { ApiResponse } from "@/lib/types/auth.types";
 import type { RefundRequest } from "@/lib/types/booking.types";
 
@@ -79,8 +81,11 @@ const RefundRequestModal: React.FC<{
   onSuccess: () => void;
 }> = ({ booking, isOpen, onClose, onSuccess }) => {
   const { createRefundRequest, loading, error, success } = useRefundRequest();
+  const { config: appConfig } = useAppConfig();
+  const refundLadder = getRefundLadder(appConfig);
   const [refundReason, setRefundReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const formatPrice = (priceInCents: number): string => {
     return new Intl.NumberFormat('en-CA', {
@@ -92,13 +97,15 @@ const RefundRequestModal: React.FC<{
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    setSubmitError(null);
+
     if (!refundReason.trim()) {
-      alert('Please provide a reason for the refund request');
+      setSubmitError('Please provide a reason for the refund request.');
       return;
     }
 
     if (refundReason.trim().length < 10) {
-      alert('Please provide a more detailed reason (at least 10 characters)');
+      setSubmitError('Please provide a more detailed reason (at least 10 characters).');
       return;
     }
 
@@ -114,16 +121,23 @@ const RefundRequestModal: React.FC<{
       const response = await createRefundRequest(refundData);
 
       if (response.success) {
-        // Success - show confirmation and close modal
-        alert('Refund request submitted successfully! We will process your request within 3-5 business days.');
         onSuccess();
         onClose();
         setRefundReason('');
       } else {
-        alert(getFriendlyErrorMessage(response.error, "We couldn't submit your refund request. Please try again."));
+        // Eligibility is decided entirely server-side and the rejection carries
+        // the live cutoff, e.g. "Refund requests must be made at least 24 hours
+        // before the test date". Render it in place rather than in an alert(),
+        // so the user can read it next to the form instead of it vanishing.
+        setSubmitError(
+          getFriendlyErrorMessage(
+            response.error,
+            "We couldn't submit your refund request. Please try again."
+          )
+        );
       }
     } catch {
-      alert('An error occurred while submitting your refund request. Please try again.');
+      setSubmitError('An error occurred while submitting your refund request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -203,12 +217,14 @@ const RefundRequestModal: React.FC<{
             </p>
           </div>
 
-          {/* Error Display */}
-          {error && (
+          {/* Error Display. `submitError` carries the server's own rejection —
+              including the refund-window message, which interpolates the live
+              admin setting — so it takes precedence over the hook's generic one. */}
+          {(submitError || error) && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-red-500" />
-                <span className="text-sm text-red-700">{error}</span>
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <span className="text-sm text-red-700">{submitError || error}</span>
               </div>
             </div>
           )}
@@ -229,9 +245,24 @@ const RefundRequestModal: React.FC<{
               <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-medium text-blue-900 mb-1">Important Information</h4>
+                {/* The ladder is rendered from the server's live settings, so it
+                    stays correct if an admin retunes the windows. When the
+                    config isn't available we say less rather than guess. */}
+                {refundLadder ? (
+                  <ul className="text-sm text-blue-800 space-y-0.5 mb-2">
+                    {describeRefundLadder(refundLadder).map((band) => (
+                      <li key={band.window} className="flex justify-between gap-3">
+                        <span>{band.window}</span>
+                        <span className="font-medium whitespace-nowrap">{band.outcome}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 <p className="text-sm text-blue-800">
                   Your refund request will be reviewed by our team. Processing time is typically 3-5 business days.
-                  The refund amount will be determined based on our cancellation policy and the timing of your request.
+                  {refundLadder
+                    ? ' The exact amount is confirmed when your request is submitted.'
+                    : ' The refund amount is determined by our cancellation policy and how far ahead of your test you cancel — we’ll confirm the exact amount when your request is submitted.'}
                 </p>
               </div>
             </div>

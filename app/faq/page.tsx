@@ -8,10 +8,28 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { faqCategories } from "@/lib/data/faq-data";
+import { faqCategories, type FaqQuestion } from "@/lib/data/faq-data";
 import RatingBar from "@/components/shared/RatingBar";
+import { fetchAppConfigOnServer } from "@/lib/config/app-config";
+import {
+  describeRefundLadderSentence,
+  getRefundLadder,
+} from "@/lib/utils/refund-policy";
 
-export default function FAQPage() {
+export default async function FAQPage() {
+  // Fetched server-side so the answer is in the HTML (SEO) and still tracks the
+  // admin's settings, refreshing within the revalidate window rather than at
+  // the next deploy.
+  const config = await fetchAppConfigOnServer();
+  const refundLadder = getRefundLadder(config);
+
+  const resolveAnswer = (faq: FaqQuestion): string => {
+    if (faq.answerKey === "refund-ladder") {
+      return describeRefundLadderSentence(refundLadder);
+    }
+    return faq.answer ?? "";
+  };
+
   return (
     <main className="bg-white">
       {/* Hero Section */}
@@ -63,7 +81,7 @@ export default function FAQPage() {
                     {faq.question}
                   </AccordionTrigger>
                   <AccordionContent className="text-gray-600 text-xl pb-4">
-                    {faq.answer}
+                    {resolveAnswer(faq)}
                   </AccordionContent>
                 </AccordionItem>
               ))}

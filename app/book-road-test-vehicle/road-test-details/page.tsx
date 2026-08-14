@@ -11,6 +11,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import BookingStepsProgress from "@/components/booking/BookingStepsProgress";
 import HintTooltip from "@/components/shared/HintTooltip";
 import type { DriveTestCenter, TestType } from "@/lib/types/booking.types";
+import { useAppConfig } from "@/lib/context/ConfigContext";
 import { Loader2, AlertCircle } from "lucide-react";
 
 // Define booking steps with paths
@@ -32,12 +33,29 @@ export default function RoadTestDetails() {
     calculatePricing
   } = useBooking();
 
-  // Calculate minimum allowed datetime (48 hours from now)
+  const { config: appConfig } = useAppConfig();
+
+  // Minimum booking notice, straight from the server. `null` means the server
+  // did not tell us — in which case we impose NO client-side floor and let the
+  // server reject if it must. Guessing a floor is how we ended up blocking
+  // same-day bookings while the live setting was 0 days.
+  const minLeadDays = appConfig?.bookingMinLeadDays ?? null;
+
+  // Earliest slot we'll offer, mirroring the server's ROLLING window
+  // (`DateTime.utc().plus({ days })`, compared at full precision).
   const minDateTime = React.useMemo(() => {
-    const now = new Date();
-    const min = new Date(now.getTime() + (48 * 60 * 60 * 1000)); // 48 hours in milliseconds
-    return min;
-  }, []);
+    if (minLeadDays === null) return undefined;
+    return new Date(Date.now() + minLeadDays * 24 * 60 * 60 * 1000);
+  }, [minLeadDays]);
+
+  // One hint for both pickers, phrased from the live setting. With a 0-day
+  // notice the constraint is simply "in the future", not "N days ahead".
+  const leadTimeHint =
+    minLeadDays === null
+      ? 'Choose a date and time in the future.'
+      : minLeadDays === 0
+        ? 'Same-day booking is available. Times already past are disabled.'
+        : `Must be at least ${minLeadDays} day${minLeadDays === 1 ? '' : 's'} from now. Earlier slots are disabled.`;
 
   // Local state for form management
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
@@ -145,31 +163,24 @@ export default function RoadTestDetails() {
       errors.push('Please select a test time');
     }
 
-    // Validate date is not in the past and is at least 2 days (48 hours) from now
+    // Lead-time check against the server's live setting, compared as a ROLLING
+    // window at full precision — the same way the server does.
+    //
+    // A pre-submit convenience only. If it passes and the server still refuses,
+    // the server's message (which interpolates the live value) is what the user
+    // sees. When minLeadDays is unknown we skip this entirely rather than
+    // inventing a floor.
     if (bookingState.testDate && bookingState.testTime) {
       const selectedDateTime = new Date(`${bookingState.testDate}T${bookingState.testTime}`);
-      const now = new Date();
 
-      // Check if date is in the past
-      if (selectedDateTime <= now) {
+      if (selectedDateTime <= new Date()) {
         errors.push('Please select a future date and time');
-      } else {
-        // Check if date is at least 2 days (48 hours) from now
-        // This means if today is Dec 16, earliest available date is Dec 19
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Reset to start of today
-
-        const minDateFromNow = new Date(today);
-        minDateFromNow.setDate(minDateFromNow.getDate() + 3);
-
-        // Parse the selected date properly in local timezone (not UTC)
-        const [year, month, day] = bookingState.testDate.split('-').map(Number);
-        const selectedDateOnly = new Date(year, month - 1, day); // month is 0-indexed
-        selectedDateOnly.setHours(0, 0, 0, 0);
-
-        if (selectedDateOnly < minDateFromNow) {
-          errors.push('Test date must be at least 2 days (48 hours) in advance. Please select a date that is at least 3 calendar days from today.');
-        }
+      } else if (minDateTime && selectedDateTime < minDateTime) {
+        errors.push(
+          minLeadDays === 0
+            ? 'Please choose a time in the future.'
+            : `Please choose a slot at least ${minLeadDays} day${minLeadDays === 1 ? '' : 's'} from now.`
+        );
       }
     }
 
@@ -285,13 +296,13 @@ export default function RoadTestDetails() {
           <div>
             <label className="text-sm font-black text-gray-600 mb-1 flex items-center gap-1.5">
               Road Test Date
-              <HintTooltip text="Must be at least 48 hours from now. Earlier dates are grayed out." />
+              <HintTooltip text={leadTimeHint} />
             </label>
             <DatePicker
               date={selectedDate}
               setDate={handleDateTimeChange}
               disabled={!selectedCenter}
-              minDaysFromToday={3}
+              minDaysFromToday={minLeadDays ?? 0}
             />
             {!selectedCenter && (
               <p className="text-sm text-gray-500 mt-1">
@@ -303,7 +314,7 @@ export default function RoadTestDetails() {
           <div>
             <label className="text-sm font-black text-gray-600 mb-1 flex items-center gap-1.5">
               Road Test Time
-              <HintTooltip text="Time must be at least 48 hours from now. Earlier times are disabled." />
+              <HintTooltip text={leadTimeHint} />
             </label>
             <TimePicker
               date={selectedDate}

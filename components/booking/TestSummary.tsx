@@ -9,7 +9,7 @@ import SummaryAddOns from "./SummaryAddOns";
 import { AddOnType } from "@/app/book-road-test-vehicle/test-details/page";
 import { useBooking } from "@/lib/context/BookingContext";
 import { useCouponVerification } from "@/lib/hooks/useBooking";
-import { formatPrice } from "@/lib/types/booking.types";
+import { formatPrice, type Coupon } from "@/lib/types/booking.types";
 import { deriveBookingAdjustment } from "@/lib/pricing/calculate";
 import { getFriendlyErrorMessage } from "@/lib/utils/error-messages";
 
@@ -65,7 +65,7 @@ export default function TestSummary({
 }: TestSummaryProps) {
   const [promoCode, setPromoCode] = React.useState("");
   const [couponError, setCouponError] = React.useState("");
-  const [acceptedCouponCode, setAcceptedCouponCode] = React.useState<string | null>(null);
+  const [acceptedCoupon, setAcceptedCoupon] = React.useState<Coupon | null>(null);
 
   const { bookingState } = useBooking();
   const { verifyCoupon, loading: couponLoading } = useCouponVerification();
@@ -93,11 +93,11 @@ export default function TestSummary({
 
       if (!result) {
         setCouponError("That coupon code isn't valid. Please check it and try again.");
-        setAcceptedCouponCode(null);
+        setAcceptedCoupon(null);
         return;
       }
 
-      setAcceptedCouponCode(result.code || code);
+      setAcceptedCoupon({ ...result, code: result.code || code });
       onApplyPromo(code);
       setPromoCode("");
     } catch (error) {
@@ -105,7 +105,7 @@ export default function TestSummary({
       setCouponError(
         getFriendlyErrorMessage(undefined, "Failed to verify coupon. Please try again.")
       );
-      setAcceptedCouponCode(null);
+      setAcceptedCoupon(null);
     }
   };
 
@@ -210,7 +210,7 @@ export default function TestSummary({
     }
 
     breakdown.push({
-      label: acceptedCouponCode ? "Total before discount" : "Total Payment",
+      label: acceptedCoupon ? "Total before discount" : "Total Payment",
       price: formatCurrency(preview.total),
       isTotal: true,
     });
@@ -273,10 +273,23 @@ export default function TestSummary({
                 <p className="text-xs text-red-500 mt-1">{couponError}</p>
               )}
 
-              {acceptedCouponCode && (
+              {acceptedCoupon && (
                 <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
-                  <p className="text-xs text-green-700">
-                    {`✅ Coupon "${acceptedCouponCode}" accepted. Your discount is applied at checkout.`}
+                  <p className="text-xs font-medium text-green-800">
+                    {`✅ Coupon "${acceptedCoupon.code}" accepted`}
+                  </p>
+                  {/* The server builds `name`/`description` from the live
+                      settings — e.g. "10% Off - Test Failed" is rendered from
+                      failure_coupon_percentage. Showing them means the stated
+                      discount stays correct if an admin changes that value,
+                      which a hardcoded "10% off" would not. */}
+                  {(acceptedCoupon.description || acceptedCoupon.name) && (
+                    <p className="text-xs text-green-700 mt-0.5">
+                      {acceptedCoupon.description || acceptedCoupon.name}
+                    </p>
+                  )}
+                  <p className="text-xs text-green-700 mt-0.5">
+                    Your discount is applied at checkout.
                   </p>
                 </div>
               )}
@@ -324,7 +337,7 @@ export default function TestSummary({
                   {item.price}
                 </span>
               </div>
-              {!serverBooking && acceptedCouponCode && (
+              {!serverBooking && acceptedCoupon && (
                 <p className="text-xs text-gray-600 mt-2">
                   Your coupon discount is calculated at checkout and shown on your
                   confirmed booking.

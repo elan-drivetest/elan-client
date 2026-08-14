@@ -1,5 +1,24 @@
 // lib/data/faq-data.ts
-export const faqCategories = [
+//
+// Answers are either a literal string or an `answerKey`, which the FAQ page
+// resolves at render time from the server's live settings. Anything quoting a
+// number an admin can change (refund windows, the partial rate) must use a key
+// rather than a sentence, or it goes stale silently.
+
+export type FaqAnswerKey = 'refund-ladder';
+
+export interface FaqQuestion {
+  question: string;
+  answer?: string;
+  answerKey?: FaqAnswerKey;
+}
+
+export interface FaqCategory {
+  title: string;
+  questions: FaqQuestion[];
+}
+
+export const faqCategories: FaqCategory[] = [
   {
     title: "Booking & Pricing",
     questions: [
@@ -20,8 +39,11 @@ export const faqCategories = [
         answer: "We accept all major credit cards, debit cards, and digital payment methods like PayPal. We also offer 0% interest financing options through Klarna and Afterpay, allowing you to pay for your booking in installments."
       },
       {
+        // Resolved at render time from the server's live refund settings — see
+        // `answerKey` above. The windows and the partial rate are admin-tunable,
+        // so this answer must never be a hardcoded sentence.
         question: "Is there a cancellation fee?",
-        answer: "You can cancel free of charge up to 48 hours before your scheduled time. Cancellations within 48 hours may be subject to a 50% fee. No-shows are charged the full amount."
+        answerKey: "refund-ladder" as const
       }
     ]
   },
