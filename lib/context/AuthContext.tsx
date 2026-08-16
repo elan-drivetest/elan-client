@@ -15,15 +15,41 @@ import { authApi } from '@/lib/api';
 import { onSessionExpired } from '@/lib/http/session-events';
 import type { UserProfile } from '@/lib/types/auth.types';
 
+/**
+ * Three-way session verdict.
+ *
+ * `isAuthenticated` alone cannot tell "the backend said you are logged out"
+ * apart from "we never got an answer", and on a cold page load there is no
+ * prior user in memory to fall back on — so a single dropped request read as a
+ * logout and bounced people to /login. Pages that gate on auth should redirect
+ * on `'anonymous'` only, and offer a retry on `'unknown'`.
+ */
+export type AuthStatus = 'unknown' | 'authenticated' | 'anonymous';
+
 interface AuthContextType {
   user: UserProfile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  authStatus: AuthStatus;
   login: (user: UserProfile) => void;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<UserProfile | null>;
   refreshAuth: () => Promise<boolean>;
 }
+
+// How long to wait before asking /me a second time when the first attempt was
+// inconclusive. Long enough to ride out a dev-API cold start or a dropped
+// connection on a flaky mobile link, short enough not to stall the first paint.
+const INCONCLUSIVE_RETRY_DELAY_MS = 1200;
+
+// Only the backend actively rejecting us settles the question. Everything else
+// — status_code 0 (never reached the backend) and 5xx (backend unwell) — is an
+// absence of evidence, not evidence of a logout.
+const isConclusiveRejection = (status: number): boolean =>
+  status === 401 || status === 403;
+
+const delay = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -50,6 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // the logged-out UI.
   const [isLoading, setIsLoading] = useState(true);
 
+  // Stays 'unknown' until the backend gives us a definitive answer. An
+  // inconclusive check deliberately leaves it alone.
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('unknown');
+
   // Mirrors `user` for reads inside callbacks that must not re-subscribe on
   // every user change (the session-expiry listener, in-flight request handlers).
   const userRef = useRef<UserProfile | null>(null);
@@ -57,9 +87,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasBootstrapped = useRef(false);
   const isRedirecting = useRef(false);
 
+  // Every call site here is a definitive verdict — a profile we just read, a
+  // 401/403, a logout, a failed refresh — so deriving the status is safe. The
+  // inconclusive path below never reaches this function, which is exactly how
+  // 'unknown' survives a blip.
   const applyUser = useCallback((nextUser: UserProfile | null) => {
     userRef.current = nextUser;
     setUser(nextUser);
+    setAuthStatus(nextUser ? 'authenticated' : 'anonymous');
   }, []);
 
   // Ask the backend who we are.
@@ -77,7 +112,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const request = (async (): Promise<UserProfile | null> => {
       try {
-        const result = await authApi.getCurrentUser();
+        let result = await authApi.getCurrentUser();
+
+        // Ask once more before drawing any conclusion from a non-answer. On a
+        // cold load there is no prior session to fall back on, so an
+        // inconclusive first attempt would otherwise present as a logout and
+        // send the user to /login.
+        if (
+          !result.success &&
+          !isConclusiveRejection(result.error?.status_code ?? 0)
+        ) {
+          await delay(INCONCLUSIVE_RETRY_DELAY_MS);
+          result = await authApi.getCurrentUser();
+        }
 
         if (result.success && result.data) {
           applyUser(result.data);
@@ -91,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // timeout) and 5xx means the backend is unwell — neither is evidence
         // that the session ended. Treating them as a logout is why a transient
         // blip used to eject users; we keep whatever session we already had.
-        if (status === 401 || status === 403) {
+        if (isConclusiveRejection(status)) {
           applyUser(null);
           return null;
         }
@@ -200,6 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     isLoading,
     isAuthenticated: !!user,
+    authStatus,
     login,
     logout,
     checkAuthStatus,

@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import SessionUnavailable from "@/components/dashboard/SessionUnavailable";
 import HelpCard from "@/components/booking/HelpCard";
 import { useAuth } from "@/lib/context/AuthContext";
 import { bookingApi } from "@/lib/api";
@@ -314,7 +315,7 @@ const DashboardBookingCard: React.FC<{
 };
 
 export default function Dashboard() {
-  const { user, isLoading, isAuthenticated, checkAuthStatus } = useAuth();
+  const { user, isLoading, isAuthenticated, authStatus, checkAuthStatus } = useAuth();
   const router = useRouter();
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
   const [recentBooking, setRecentBooking] = useState<RecentBookingResponse | null>(null);
@@ -356,12 +357,14 @@ export default function Dashboard() {
   }, [user, hasCheckedAuth, isLoading, checkAuthStatus]);
 
   useEffect(() => {
-    // After we've checked auth and we're not loading, redirect if not authenticated
-    if (hasCheckedAuth && !isLoading && !isAuthenticated) {
+    // Redirect only when the backend actually rejected us. `authStatus` stays
+    // 'unknown' when the check never completed, and bouncing to /login on that
+    // is how a dropped request turned into a phantom logout.
+    if (hasCheckedAuth && !isLoading && authStatus === 'anonymous') {
       console.log('Dashboard: User not authenticated, redirecting to login...');
       router.push('/login');
     }
-  }, [hasCheckedAuth, isLoading, isAuthenticated, router]);
+  }, [hasCheckedAuth, isLoading, authStatus, router]);
 
   // Fetch bookings when authenticated
   useEffect(() => {
@@ -380,6 +383,12 @@ export default function Dashboard() {
         </div>
       </div>
     );
+  }
+
+  // We asked and never got an answer. Offer a retry rather than implying the
+  // session ended — it probably hasn't.
+  if (hasCheckedAuth && authStatus === 'unknown') {
+    return <SessionUnavailable onRetry={() => checkAuthStatus()} isRetrying={isLoading} />;
   }
 
   // Show login prompt if we've checked auth and user is not authenticated

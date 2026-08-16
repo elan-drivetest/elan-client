@@ -46,8 +46,60 @@ const refreshClient = axios.create({
 
 let inFlightRefresh: Promise<void> | null = null;
 
+// ---------------------------------------------------------------------------
+// Cross-tab coordination
+//
+// `inFlightRefresh` is module-level, which means per TAB. Two tabs bootstrapping
+// at the same time each ran their own refresh, and because the backend rotated
+// the refresh token on every call, the loser presented a stale cookie, got a
+// 401, and the user was hard-logged-out mid-session. Unifying the three axios
+// instances fixed instance-vs-instance races; it never touched tab-vs-tab.
+//
+// Web Locks are same-origin and released automatically when a holder's tab dies,
+// so a crashed leader cannot wedge every other tab.
+// ---------------------------------------------------------------------------
+
+const REFRESH_LOCK_NAME = 'elan-auth-refresh';
+
+// Stamped by whichever tab last completed a refresh. A tab queued behind the
+// lock reads this, sees a completion newer than its own request, and skips its
+// round trip — the renewed cookies are already in the shared cookie jar.
+const LAST_REFRESH_KEY = 'elan:auth:last-refresh-at';
+
+const readLastRefreshAt = (): number => {
+  try {
+    return Number(window.localStorage.getItem(LAST_REFRESH_KEY)) || 0;
+  } catch {
+    // Storage disabled (private mode, blocked cookies): lose the skip, not the
+    // refresh. Reporting 0 just means we never skip.
+    return 0;
+  }
+};
+
+const markRefreshed = (): void => {
+  try {
+    window.localStorage.setItem(LAST_REFRESH_KEY, String(Date.now()));
+  } catch {
+    // Non-fatal — see readLastRefreshAt.
+  }
+};
+
+const supportsWebLocks = (): boolean =>
+  typeof navigator !== 'undefined' &&
+  typeof navigator.locks?.request === 'function';
+
+const performRefresh = async (requestedAt: number): Promise<void> => {
+  // Another tab refreshed while we sat in the lock queue. Its cookies are ours
+  // too, so a second call would only burn a round trip.
+  if (readLastRefreshAt() > requestedAt) return;
+
+  await refreshClient.post('/auth/customer/refresh');
+  markRefreshed();
+};
+
 /**
- * Refresh the session, coalescing concurrent callers onto a single request.
+ * Refresh the session, coalescing concurrent callers onto a single request
+ * within this tab and serialising against every other tab.
  *
  * Deliberately does NOT pre-check for the refresh cookie: `_elanAuthR` is set
  * by the API domain and is HttpOnly, so `document.cookie` can never see it. A
@@ -56,12 +108,18 @@ let inFlightRefresh: Promise<void> | null = null;
  */
 export function refreshSession(): Promise<void> {
   if (!inFlightRefresh) {
-    inFlightRefresh = refreshClient
-      .post('/auth/customer/refresh')
-      .then(() => undefined)
-      .finally(() => {
-        inFlightRefresh = null;
-      });
+    // Captured before we queue for the lock, so the skip check compares against
+    // when we decided we needed a refresh — not when we finally got the lock.
+    const requestedAt = Date.now();
+    const run = () => performRefresh(requestedAt);
+
+    inFlightRefresh = (
+      supportsWebLocks()
+        ? navigator.locks.request(REFRESH_LOCK_NAME, run)
+        : run()
+    ).finally(() => {
+      inFlightRefresh = null;
+    });
   }
 
   return inFlightRefresh;

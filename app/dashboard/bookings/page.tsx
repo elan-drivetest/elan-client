@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Check, Phone, Loader2, Clock, AlertCircle, Calendar, MapPin, X, DollarSign, RefreshCw } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import SessionUnavailable from "@/components/dashboard/SessionUnavailable";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatCanadianPhoneDisplay, toE164Canadian } from "@/lib/utils/phone.utils";
@@ -898,7 +899,7 @@ export default function Bookings() {
   const [refundRequests, setRefundRequests] = useState<Record<number, RefundRequest>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user, isLoading: authLoading, isAuthenticated, checkAuthStatus } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated, authStatus, checkAuthStatus } = useAuth();
   const router = useRouter();
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
@@ -970,13 +971,15 @@ export default function Bookings() {
     }
   }, [user, hasCheckedAuth, authLoading, checkAuthStatus]);
 
-  // Redirect if not authenticated
+  // Redirect only when the backend actually rejected us. `authStatus` stays
+  // 'unknown' when the check never completed, and bouncing to /login on that is
+  // how a dropped request turned into a phantom logout.
   useEffect(() => {
-    if (hasCheckedAuth && !authLoading && !isAuthenticated) {
+    if (hasCheckedAuth && !authLoading && authStatus === 'anonymous') {
       console.log('Bookings: User not authenticated, redirecting to login...');
       router.push('/login');
     }
-  }, [hasCheckedAuth, authLoading, isAuthenticated, router]);
+  }, [hasCheckedAuth, authLoading, authStatus, router]);
 
   // Fetch bookings when authenticated
   useEffect(() => {
@@ -1010,6 +1013,12 @@ export default function Bookings() {
         </div>
       </div>
     );
+  }
+
+  // We asked and never got an answer. Offer a retry rather than implying the
+  // session ended — it probably hasn't.
+  if (hasCheckedAuth && authStatus === 'unknown') {
+    return <SessionUnavailable onRetry={() => checkAuthStatus()} isRetrying={authLoading} />;
   }
 
   // Show login prompt if not authenticated
