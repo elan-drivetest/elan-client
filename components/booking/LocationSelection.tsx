@@ -592,13 +592,6 @@ export default function LocationSelection({
           {/* Helper Text */}
           <div className="mt-3 text-xs text-gray-500">
             <p>💡 Tip: Include your postal code for better accuracy</p>
-            {pricingConfig && (
-              <p>
-                • Distance-based pricing: first {pricingConfig.baseDistance} km at{' '}
-                {formatPrice(pricingConfig.baseRate)}/km, then{' '}
-                {formatPrice(pricingConfig.normalRate)}/km
-              </p>
-            )}
           </div>
         </div>
       )}
