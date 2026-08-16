@@ -33,6 +33,7 @@ async function main() {
     ['refundPartialPercentage', config.refundPartialPercentage],
     ['failureCouponPercentage', config.failureCouponPercentage],
     ['failureCouponValidityMonths', config.failureCouponValidityMonths],
+    ['maxPickupDistanceKm', config.maxPickupDistanceKm],
   ];
 
   for (const [name, value] of required) {
@@ -43,24 +44,52 @@ async function main() {
     );
   }
 
+  // ---- Serviceability bound ------------------------------------------------
+  // The booking form refuses a pickup past this before the customer can reach
+  // Stripe. A null means the deployed backend predates `max_pickup_distance_km`
+  // and the client imposes NO limit — the server still rejects, but only after
+  // the customer has filled the form. That is a deploy gap, not a code bug.
+  if (config.maxPickupDistanceKm === null) {
+    console.log(
+      '\n  max_pickup_distance_km is NOT published by this backend — the ' +
+        "client-side pickup guard is inert until it's deployed."
+    );
+  } else {
+    console.log(
+      `\n  max_pickup_distance_km = ${config.maxPickupDistanceKm} km → pickups beyond this are refused in the form`
+    );
+  }
+
   // ---- Pickup fare, cross-checked against the admin panel's own examples --
   // The settings page states: "A 70 km pickup still sits inside the included
-  // distance, so it is all charged at $2.00/km — $140.00", "Every 10 km inside
-  // the first 100 km adds $20.00", "Every 10 km past ... adds $25.00".
-  const inside = previewPickupPrice(70, config);
+  // distance, so it is all charged at $2.00/km", "Every 10 km inside the first
+  // 100 km adds $20.00", "Every 10 km past ... adds $25.00".
+  //
+  // Those sentences were written when base_distance was 100. The sample
+  // distances below are therefore DERIVED from the live `baseDistance` rather
+  // than hardcoded: with the live value now 50, a literal 70 km sample is not
+  // "inside the included distance" at all, and this check failed for years'
+  // worth of the wrong reason — reporting a contract break where the only thing
+  // that had changed was an admin lowering the threshold.
+  const insideKm = Math.max(1, Math.floor(config.baseDistance * 0.7));
+  const inside = previewPickupPrice(insideKm, config);
   check(
     'a pickup inside the included distance is all charged at base_rate',
-    inside === Math.round(70 * config.baseRate),
-    `70km → ${inside}`
+    inside === Math.round(insideKm * config.baseRate),
+    `${insideKm}km → ${inside}`
   );
 
-  const tenInside =
-    previewPickupPrice(60, config) - previewPickupPrice(50, config);
-  check(
-    '10 km inside the included distance costs 10 × base_rate',
-    tenInside === 10 * config.baseRate,
-    `${tenInside}`
-  );
+  // Needs two points at least 10 km apart that both sit inside the threshold.
+  if (config.baseDistance >= 10) {
+    const tenInside =
+      previewPickupPrice(config.baseDistance, config) -
+      previewPickupPrice(config.baseDistance - 10, config);
+    check(
+      '10 km inside the included distance costs 10 × base_rate',
+      tenInside === 10 * config.baseRate,
+      `${tenInside}`
+    );
+  }
 
   const beyondA = previewPickupPrice(config.baseDistance + 10, config);
   const beyondB = previewPickupPrice(config.baseDistance + 20, config);

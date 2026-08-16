@@ -51,6 +51,18 @@ export interface PolicyConfig {
   failureCouponPercentage: number | null;
   /** How long that coupon stays valid, in months. */
   failureCouponValidityMonths: number | null;
+  /**
+   * Furthest a pickup may be from the test centre, in km.
+   *
+   * A *serviceability* limit, not a pricing knob: past it the server refuses the
+   * booking rather than pricing it. Nothing bounded this before, so a geocode
+   * that landed in the wrong province produced a four-figure road-test fare and
+   * published a multi-thousand-kilometre job to the instructor board.
+   *
+   * `null` on a backend that predates the setting — impose no constraint then,
+   * exactly as with `bookingMinLeadDays`. The server enforces regardless.
+   */
+  maxPickupDistanceKm: number | null;
 }
 
 export type AppConfig = PickupPricingConfig & PolicyConfig;
@@ -93,6 +105,7 @@ function parseAppConfig(data: any): AppConfig | null {
     refundPartialPercentage: asNumber(data?.refund_partial_percentage),
     failureCouponPercentage: asNumber(data?.failure_coupon_percentage),
     failureCouponValidityMonths: asNumber(data?.failure_coupon_validity_months),
+    maxPickupDistanceKm: asNumber(data?.max_pickup_distance_km),
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */

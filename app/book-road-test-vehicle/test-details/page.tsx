@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import BookingStepsProgress from "@/components/booking/BookingStepsProgress";
 import ContactDetails from "@/components/booking/ContactDetails";
@@ -17,6 +17,7 @@ import { addonsForTestType, findThirtyMinuteLesson } from "@/lib/pricing/calcula
 import { formatPrice } from "@/lib/types/booking.types";
 import PickupOptions from "@/components/booking/PickupOptions";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
+import { bookingUtils } from "@/lib/utils/booking.utils";
 
 const bookingSteps = [
   { id: 1, name: "Road Test Details", path: "/book-road-test-vehicle/road-test-details" },
@@ -62,20 +63,29 @@ export default function TestDetails() {
     resetState: resetLicenseUpload
   } = useFileUpload();
   
-  // Initialize with data from context or defaults
-  const [locationOption, setLocationOption] = useState<LocationOption>(
-    bookingState.locationOption || "test-centre"
-  );
-  const [selectedAddOn, setSelectedAddOn] = useState<AddOnType>(
-    bookingState.selectedAddOn || null
-  );
-  // Document upload states
-  const [roadTestDocUrl, setRoadTestDocUrl] = useState<string | null>(
-    bookingState.documents?.roadTestFile || null
-  );
-  const [licenseDocUrl, setLicenseDocUrl] = useState<string | null>(
-    bookingState.documents?.licenseFile || null
-  );
+  // DERIVED, never local state.
+  //
+  // These were `useState` initialised from `bookingState`, but BookingProvider
+  // hydrates from localStorage in an effect that runs AFTER this component's
+  // first render. So on any reload of this step the initialiser captured the
+  // pre-hydration defaults ('test-centre' / null) and then never re-synced,
+  // because a useState initialiser only runs once.
+  //
+  // The radio therefore showed "Meet at the test centre" while the state — and
+  // so `transformToApiFormat`, which reads `bookingState.locationOption` — still
+  // said 'pickup'. That is how bookings were created with `meet_at_center: false`
+  // carrying a stale pickup address and distance, and priced accordingly. The
+  // same desync silently un-ticked a selected add-on the customer still paid for.
+  //
+  // Reading straight through to the context removes the second copy entirely.
+  const locationOption: LocationOption = bookingState.locationOption ?? "test-centre";
+  const selectedAddOn: AddOnType = bookingState.selectedAddOn ?? null;
+  // Document URLs — derived for the same reason as the two above, and this one
+  // was outright blocking: the Continue button is disabled unless both are set,
+  // so after a reload of this step the customer saw two empty upload cards and a
+  // dead button, and had to re-upload documents that were already stored.
+  const roadTestDocUrl: string | null = bookingState.documents?.roadTestFile ?? null;
+  const licenseDocUrl: string | null = bookingState.documents?.licenseFile ?? null;
   
   // Add-ons available for this booking's test type, filtered by `type` — the
   // field the server keys off — rather than by matching words in the name.
@@ -94,8 +104,76 @@ export default function TestDetails() {
     availableAddons.find(addon => addon.name.toLowerCase().startsWith('1 hour lesson')) ?? null;
 
 
+  // The selected centre, resolved once. This lookup used to be inlined in the
+  // JSX and run three times to build one coordinate pair.
+  const selectedCenter = useMemo(() => {
+    const centerName =
+      typeof bookingState.testCenter === 'string'
+        ? bookingState.testCenter
+        : bookingState.testCenter?.name;
+
+    return (
+      testCenters.find(
+        (c) => c.id === bookingState.testCenterId || c.name === centerName
+      ) ?? null
+    );
+  }, [testCenters, bookingState.testCenterId, bookingState.testCenter]);
+
+  const testCenterCoordinates = useMemo(
+    () =>
+      selectedCenter
+        ? { lat: selectedCenter.lat, lng: selectedCenter.lng }
+        : undefined,
+    [selectedCenter]
+  );
+
   // Use ref to track pricing calculation
   const lastPricingStateRef = useRef<string>('');
+
+  // Re-measure the pickup whenever the centre or the pickup point changes.
+  //
+  // `pickupDistance` was measured exactly once — when the address was chosen —
+  // against whichever centre was selected AT THAT MOMENT. Going back to Step 1
+  // and picking a different centre left the old number in place, so the booking
+  // was priced, and the instructor job published, against a centre the customer
+  // had moved away from. Nothing on screen revealed the mismatch, because the
+  // address shown and the distance charged are different numbers.
+  const lastMeasuredRef = useRef<string>('');
+
+  useEffect(() => {
+    const coords = bookingState.pickupCoordinates;
+
+    if (locationOption !== 'pickup' || !coords || !testCenterCoordinates) return;
+
+    const measurementKey = JSON.stringify({ coords, testCenterCoordinates });
+    if (measurementKey === lastMeasuredRef.current) return;
+    lastMeasuredRef.current = measurementKey;
+
+    let cancelled = false;
+
+    bookingUtils
+      .calculateDistance(coords, testCenterCoordinates)
+      .then((distance) => {
+        if (cancelled || distance === bookingState.pickupDistance) return;
+        updateBookingState({ pickupDistance: distance });
+      })
+      .catch((error) => {
+        // Keep the previous value rather than replacing a real distance with a
+        // guess, and allow a retry. The server measures again on create.
+        console.error('Could not re-measure the pickup distance:', error);
+        lastMeasuredRef.current = '';
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    locationOption,
+    bookingState.pickupCoordinates,
+    bookingState.pickupDistance,
+    testCenterCoordinates,
+    updateBookingState,
+  ]);
 
   // Set current step - FIXED: No dependencies to prevent infinite renders
   useEffect(() => {
@@ -179,16 +257,18 @@ export default function TestDetails() {
   };
   
   const handleLocationChange = (option: LocationOption) => {
-    setLocationOption(option);
     updateBookingState({ locationOption: option });
-    
-    // Reset add-ons when changing location option
+
+    // Reset add-ons when changing location option.
+    // `pickupCoordinates` is cleared alongside the address and distance —
+    // leaving it behind let the re-measure effect below resurrect a distance for
+    // a pickup the customer had just cancelled.
     if (option === 'test-centre') {
-      setSelectedAddOn(null);
       updateBookingState({
         selectedAddOn: null,
         selectedAddonData: null,
         pickupAddress: undefined,
+        pickupCoordinates: undefined,
         pickupDistance: undefined
       });
     }
@@ -216,10 +296,7 @@ export default function TestDetails() {
     const newAddOn = type === selectedAddOn ? null : type;
     
     console.log('✅ Setting new add-on:', newAddOn);
-    
-    // Update local state
-    setSelectedAddOn(newAddOn);
-    
+
     // Get addon data for API integration
     let addonData = null;
     if (newAddOn === 'mock-test') {
@@ -242,17 +319,8 @@ export default function TestDetails() {
   };
   
   const handleContinue = () => {
-    // Ensure document URLs are saved for API submission
-    if (roadTestDocUrl && licenseDocUrl) {
-      updateBookingState({
-        documents: {
-          ...bookingState.documents,
-          roadTestFile: roadTestDocUrl,
-          licenseFile: licenseDocUrl
-        }
-      });
-    }
-    
+    // No document copy-back needed: the upload handlers write straight to
+    // booking state, which is now the only place these URLs live.
     setCurrentStep(4);
     router.push("/book-road-test-vehicle/payment");
   };
@@ -265,8 +333,7 @@ export default function TestDetails() {
       
       if (result.success && result.data) {
         const uploadedUrl = result.data.url;
-        setRoadTestDocUrl(uploadedUrl);
-        
+
         // Update booking state with both URL and file metadata
         updateBookingState({
           documents: {
@@ -293,8 +360,7 @@ export default function TestDetails() {
       
       if (result.success && result.data) {
         const uploadedUrl = result.data.url;
-        setLicenseDocUrl(uploadedUrl);
-        
+
         // Update booking state with both URL and file metadata
         updateBookingState({
           documents: {
@@ -359,25 +425,7 @@ export default function TestDetails() {
             selectedOption={locationOption}
             onOptionChange={handleLocationChange}
             onPickupLocationSelect={handlePickupLocationSelect}
-            testCenterCoordinates={
-              testCenters.length > 0 && bookingState.testCenter
-                ? testCenters.find(c => 
-                    c.id === bookingState.testCenterId || 
-                    c.name === (typeof bookingState.testCenter === 'string' ? bookingState.testCenter : bookingState.testCenter?.name)
-                  ) 
-                  ? { 
-                      lat: testCenters.find(c => 
-                        c.id === bookingState.testCenterId || 
-                        c.name === (typeof bookingState.testCenter === 'string' ? bookingState.testCenter : bookingState.testCenter?.name)
-                      )!.lat, 
-                      lng: testCenters.find(c => 
-                        c.id === bookingState.testCenterId || 
-                        c.name === (typeof bookingState.testCenter === 'string' ? bookingState.testCenter : bookingState.testCenter?.name)
-                      )!.lng 
-                    }
-                  : undefined
-                : undefined
-            }
+            testCenterCoordinates={testCenterCoordinates}
           />
 
           <Separator className="mb-8" />

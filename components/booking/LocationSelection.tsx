@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Check, AlertTriangle, MapPin, Navigation, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBooking } from "@/lib/context/BookingContext";
+import { useAppConfig } from "@/lib/context/ConfigContext";
 import { useAddressSearch } from "@/lib/hooks/useBooking";
 import { AddressSearchResult, formatPrice } from "@/lib/types/booking.types";
 import { bookingUtils } from "@/lib/utils/booking.utils";
@@ -73,6 +74,27 @@ export default function LocationSelection({
   testCenterCoordinates,
 }: LocationSelectionProps) {
   const { bookingState, updateBookingState, pricingConfig, addons } = useBooking();
+
+  // Serviceability limit. `null` on a backend that predates the setting, in
+  // which case we impose no constraint — the server still enforces it.
+  const { config: appConfig } = useAppConfig();
+  const maxPickupDistanceKm = appConfig?.maxPickupDistanceKm ?? null;
+
+  /**
+   * Reject a pickup the server would refuse, at the moment it is chosen.
+   *
+   * Without this the customer sailed through to Stripe on a fare built from an
+   * implausible distance — a geocode that lands in the wrong province reads as a
+   * perfectly ordinary address on screen, because the address and the distance
+   * being priced are different numbers. Wording tracks the server's own 400 so
+   * the two cannot say different things.
+   */
+  const rejectionReason = (distance: number | undefined): string | null => {
+    if (distance === undefined || maxPickupDistanceKm === null) return null;
+    if (distance <= maxPickupDistanceKm) return null;
+
+    return `That address is ${Math.round(distance)} km from the test centre, which is outside our service area. Please check the address, or choose to meet at the test centre.`;
+  };
 
   // The add-on whose price the server credits back on long pickups.
   const thirtyMinuteLesson = bookingState.testType
@@ -242,6 +264,19 @@ export default function LocationSelection({
               }
             }
 
+            const rejection = rejectionReason(distance);
+            if (rejection) {
+              setLocationError(rejection);
+              setPickupDistance(undefined);
+              setSelectedResult(null);
+              updateBookingState({
+                pickupAddress: undefined,
+                pickupCoordinates: undefined,
+                pickupDistance: undefined
+              });
+              return;
+            }
+
             // Update booking state
             updateBookingState({
               pickupAddress: address,
@@ -319,9 +354,22 @@ export default function LocationSelection({
         console.error('Error calculating distance:', error);
       }
     }
-    
+
+    const rejection = rejectionReason(distance);
+    if (rejection) {
+      setLocationError(rejection);
+      setPickupDistance(undefined);
+      setSelectedResult(null);
+      updateBookingState({
+        pickupAddress: undefined,
+        pickupCoordinates: undefined,
+        pickupDistance: undefined
+      });
+      return;
+    }
+
     // Update booking state with pickup location, coordinates, and distance
-    updateBookingState({ 
+    updateBookingState({
       pickupAddress: address,
       pickupCoordinates: { lat, lng },
       pickupDistance: distance
