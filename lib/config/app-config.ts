@@ -111,9 +111,23 @@ function parseAppConfig(data: any): AppConfig | null {
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 let cached: Promise<AppConfig> | null = null;
+let cachedAt = 0;
 
 /**
- * Fetch the config once per session.
+ * How long a fetched config is reused before the next caller refetches.
+ *
+ * These values are live admin controls — an operator changes a rate in the
+ * panel and expects the site to follow. The cache used to have no expiry at
+ * all, so a tab left open kept quoting the old rates until someone hard-
+ * reloaded, and the client preview drifted from what the server would charge.
+ *
+ * Matches the `revalidate` window used by the Server Component variant below,
+ * so the static pages and the booking flow agree on how stale they may be.
+ */
+const CONFIG_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Fetch the config, reusing the last result for `CONFIG_TTL_MS`.
  *
  * Rejects rather than falling back to constants. There used to be a 50/100/50
  * fallback here, copied from the server's own defaults — but those are what the
@@ -124,7 +138,12 @@ let cached: Promise<AppConfig> | null = null;
  * A failed fetch is not cached, so the next caller retries.
  */
 export function getAppConfig(): Promise<AppConfig> {
+  if (cached && Date.now() - cachedAt > CONFIG_TTL_MS) {
+    cached = null;
+  }
+
   if (!cached) {
+    cachedAt = Date.now();
     cached = fetch(CONFIG_URL)
       .then(async (response) => {
         if (!response.ok) {
@@ -151,6 +170,7 @@ export function getAppConfig(): Promise<AppConfig> {
 /** Drops the cached config so the next call refetches. */
 export function resetAppConfigCache(): void {
   cached = null;
+  cachedAt = 0;
 }
 
 /**

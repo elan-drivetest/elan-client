@@ -11,9 +11,11 @@ import PickupOptions from "@/components/booking/PickupOptions";
 import { useBooking } from "@/lib/context/BookingContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { authApi, handleApiError } from "@/lib/api";
+import { isInactiveAccountError } from "@/lib/utils/error-messages";
+import InactiveAccountNotice from "@/components/auth/InactiveAccountNotice";
 import { toE164Canadian, formatCanadianPhoneDisplay } from "@/lib/utils/phone.utils";
 import type { RegisterRequest, LoginRequest } from "@/lib/types/auth.types";
-import { CheckCircle, LayoutDashboard } from "lucide-react";
+import { CheckCircle, LayoutDashboard, Loader2 } from "lucide-react";
 import { ErrorAlert } from "@/components/ui/error-alert";
 
 const bookingSteps = [
@@ -26,7 +28,7 @@ const bookingSteps = [
 export default function BookingDetails() {
   const router = useRouter();
   const { bookingState, updateBookingState, setCurrentStep, refetchBookingData } = useBooking();
-  const { isAuthenticated, user, login, checkAuthStatus } = useAuth();
+  const { isAuthenticated, user, login, checkAuthStatus, authStatus, isLoading: isAuthLoading } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [errors, setErrors] = useState({ general: "" });
@@ -35,7 +37,12 @@ export default function BookingDetails() {
   const [registeredEmail, setRegisteredEmail] = useState("");
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [resendEmailSuccess, setResendEmailSuccess] = useState(false);
-  
+
+  // Set when a login was refused only because the account was never activated.
+  // Holds the address that was tried, so the activation email can be resent
+  // without asking for it again.
+  const [inactiveAccountEmail, setInactiveAccountEmail] = useState("");
+
   // Use refs to prevent infinite re-renders
   const hasSetCurrentStep = useRef(false);
   const hasCheckedAuth = useRef(false);
@@ -163,6 +170,8 @@ export default function BookingDetails() {
       if (result.success && result.data) {
         console.log('✅ Login successful');
 
+        setInactiveAccountEmail("");
+
         // Set user in auth context
         login(result.data);
 
@@ -185,6 +194,13 @@ export default function BookingDetails() {
 
         // Show success state instead of auto-redirecting
         setShowSuccessState(true);
+      } else if (isInactiveAccountError(result.error)) {
+        // The account exists and the password was right — it was simply never
+        // activated. Offer a fresh activation email rather than a dead-end
+        // error, since the original link has usually expired by now.
+        setInactiveAccountEmail(data.email);
+        setShowEmailVerificationNotice(false);
+        setErrors({ general: "" });
       } else {
         // Handle API errors
         const errorMessage = handleApiError(result.error);
@@ -231,7 +247,46 @@ export default function BookingDetails() {
     setShowLogin(!showLogin);
     setErrors({ general: "" }); // Clear errors when switching
     setShowEmailVerificationNotice(false); // Hide verification notice when switching
+    setInactiveAccountEmail("");
   };
+
+  // Wait for the session check before deciding what to render.
+  //
+  // AuthProvider asks the backend who the visitor is on every app load, and
+  // that answer takes a round trip. Rendering ahead of it meant a returning
+  // customer — with a perfectly valid session — was shown a login form first
+  // and only swapped to "Welcome back" once /me came back. People took the form
+  // at face value and typed their password into it, which is a large part of
+  // why this step felt like it demanded a fresh login every visit.
+  //
+  // `authStatus` is the right signal rather than `isAuthenticated`: on a cold
+  // load the latter is indistinguishable from a genuine logout.
+  if (authStatus === 'unknown' && isAuthLoading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <BookingStepsProgress steps={bookingSteps} />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="col-span-1 md:col-span-1">
+            <h1 className="text-2xl font-bold mb-1">Booking details</h1>
+            <p className="text-gray-600 mb-6">Checking your session…</p>
+
+            <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">
+              <Loader2 size={20} className="animate-spin text-[#0C8B44]" />
+              <span className="text-sm">
+                One moment — we&apos;re seeing whether you&apos;re already
+                signed in.
+              </span>
+            </div>
+          </div>
+
+          <div className="col-span-1">
+            <VehicleSummary />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show success state with user info and next button (only if authenticated)
   if (showSuccessState && isAuthenticated) {
@@ -313,6 +368,33 @@ export default function BookingDetails() {
           {/* Show general errors */}
           <ErrorAlert message={errors.general} className="mb-4" />
 
+          {/*
+            We asked the backend who you are and never got an answer (offline,
+            a timeout, an API cold start). That is not a logout, so don't
+            present it as one — offer another go before the login form.
+          */}
+          {authStatus === 'unknown' && !isAuthLoading && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-3">
+              <p className="text-sm text-amber-800">
+                We couldn&apos;t confirm whether you&apos;re already signed in.
+              </p>
+              <button
+                onClick={() => checkAuthStatus()}
+                className="text-sm font-medium text-amber-900 underline hover:no-underline bg-transparent border-none p-0 cursor-pointer whitespace-nowrap"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
+          {/* Account exists but was never activated — offer a fresh link */}
+          {inactiveAccountEmail && (
+            <InactiveAccountNotice
+              email={inactiveAccountEmail}
+              className="mb-6"
+            />
+          )}
+
           {/* Show email verification notice after signup */}
           {showEmailVerificationNotice && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -383,16 +465,6 @@ export default function BookingDetails() {
                 showRememberMe={false}
                 className="mb-4"
               />
-              
-              <div className="mt-4 text-sm">
-                <span className="text-gray-600">{"Don't have an account? "}</span>
-                <button 
-                  onClick={toggleAuthMode}
-                  className="text-[#0C8B44] hover:underline font-medium bg-transparent border-none p-0 cursor-pointer"
-                >
-                  Sign up
-                </button>
-              </div>
             </>
           ) : (
             <>

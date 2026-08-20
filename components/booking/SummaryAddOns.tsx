@@ -6,6 +6,11 @@ import { cn } from "@/lib/utils";
 import MockTestCard from "./MockTestCard";
 import DrivingLessonCard from "./DrivingLessonCard";
 import { AddOnType } from "@/app/book-road-test-vehicle/test-details/page";
+import { useBooking } from "@/lib/context/BookingContext";
+import {
+  findMockTestAddon,
+  findOneHourLessonAddon,
+} from "@/lib/pricing/calculate";
 
 interface SummaryAddOnsProps {
   className?: string;
@@ -20,22 +25,36 @@ export default function SummaryAddOns({
   toggleAddOn,
   onRemove
 }: SummaryAddOnsProps) {
+  // Resolved here rather than passed down so the summary's compact cards show
+  // the same live prices as the full cards on Step 3.
+  const { bookingState, addons } = useBooking();
+  const testType = bookingState.testType || null;
+
+  const mockTestAddon = testType ? findMockTestAddon(addons, testType) : null;
+  const drivingLessonAddon = testType
+    ? findOneHourLessonAddon(addons, testType)
+    : null;
+
   return (
     <div className={cn("mb-6", className)}>
       <div className="space-y-2">
         <div className="flex space-x-2">
-          <MockTestCard 
-            variant="compact" 
-            isAdded={selectedAddOn === 'mock-test'} 
+          <MockTestCard
+            variant="compact"
+            isAdded={selectedAddOn === 'mock-test'}
             onAdd={() => toggleAddOn('mock-test')}
+            testType={testType || undefined}
+            addon={mockTestAddon}
           />
-          
+
           <DrivingLessonCard
             variant="compact"
             duration="1 hour"
             description="One-on-one lesson with a professional instructor"
             isSelected={selectedAddOn === 'driving-lesson'}
             onSelect={() => toggleAddOn('driving-lesson')}
+            testType={testType || undefined}
+            addon={drivingLessonAddon}
           />
         </div>
 

@@ -182,6 +182,24 @@ function collectFieldErrors(errors: ApiError["errors"] | string): Array<[string,
 }
 
 /**
+ * True when a login failed only because the account was never activated.
+ *
+ * The backend answers `{ status_code: 422, errors: { active: "userIsNotActive" } }`.
+ * That is not a dead end — the account exists and the password was accepted —
+ * so the UI offers to send the activation email again rather than leaving the
+ * person staring at a login form they cannot get past.
+ */
+export function isInactiveAccountError(
+  error?: Partial<ApiError> | null
+): boolean {
+  if (!error) return false;
+
+  return collectFieldErrors(error.errors).some(
+    ([, code]) => code.replace(/\.$/, "").trim() === "userIsNotActive"
+  );
+}
+
+/**
  * Per-field friendly messages, for placing errors under the matching form
  * inputs. Keys are the backend field names (e.g. "email", "password").
  */

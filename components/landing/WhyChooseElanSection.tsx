@@ -28,7 +28,7 @@ const WhyChooseElanSection = () => {
       id: 2,
       number: "🟢",
       title: "Local knowledge",
-      description: "Instructors familiar with test centres offering test minute tips to pass the road test."
+      description: "Instructors familiar with test centres offering last minute tips to pass the road test."
     },
     {
       id: 3,

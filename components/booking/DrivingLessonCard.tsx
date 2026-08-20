@@ -3,7 +3,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
-import { TestType, Addon } from "@/lib/types/booking.types";
+import { TestType, Addon, formatPrice } from "@/lib/types/booking.types";
 
 interface DrivingLessonCardProps {
   className?: string;
@@ -41,6 +41,11 @@ export default function DrivingLessonCard({
 
   // Get formatted duration - ONLY ADDITION
   const displayDuration = addon?.duration ? formatDuration(addon.duration) : duration;
+
+  // Price comes from GET /addons, which is what an admin edits in
+  // Settings -> Pricing & payouts. Nothing is rendered until the catalogue
+  // loads — a wrong price is worse than no price.
+  const priceLabel = addon ? formatPrice(addon.price) : null;
   
   if (variant === "compact") {
     return (
@@ -59,6 +64,9 @@ export default function DrivingLessonCard({
             <h3 className={cn("font-medium", isSelected ? "text-[#0C8B44]" : "")}>
               {displayDuration} Driving Lesson
             </h3>
+            {priceLabel && (
+              <p className="text-xs font-semibold text-[#0C8B44] mt-0.5">{priceLabel}</p>
+            )}
             <p className="text-xs text-gray-500 mt-1">
               {description}
             </p>
@@ -89,6 +97,9 @@ export default function DrivingLessonCard({
       <div className="flex justify-between items-start">
         <div>
           <h3 className="font-medium text-gray-600">{displayDuration} Driving Lesson</h3>
+          {priceLabel && (
+            <p className="text-base font-semibold text-[#0C8B44] mt-0.5">{priceLabel}</p>
+          )}
           <p className="text-sm text-gray-500">{description}</p>
         </div>
         

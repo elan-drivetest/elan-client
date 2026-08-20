@@ -156,11 +156,18 @@ export const authApi = {
     }
   },
 
-  // Resend confirmation email
+  // Resend the sign-up activation email.
+  //
+  // POST /auth/email/confirm/resend takes the ADDRESS. This used to call
+  // /auth/email/confirm/new, which is a different endpoint entirely — it takes a
+  // `hash` and completes a change of email address — so the call was rejected as
+  // a validation error and no email was ever resent. The backend endpoint is
+  // deliberately silent about whether the address exists, so a success here means
+  // "we've handled it", not "that account exists".
   resendConfirmationEmail: async (email: string): Promise<ApiResponse> => {
     try {
       console.log('📧 Resending confirmation email to:', email);
-      await api.post('/auth/email/confirm/new', { email });
+      await api.post('/auth/email/confirm/resend', { email });
       return {
         success: true,
         data: { message: 'Confirmation email has been resent! Please check your inbox.' }

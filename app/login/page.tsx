@@ -8,6 +8,8 @@ import { FormInput } from "@/components/ui/form-input";
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { Separator } from "@/components/ui/separator";
 import { authApi, handleApiError } from "@/lib/api";
+import { isInactiveAccountError } from "@/lib/utils/error-messages";
+import InactiveAccountNotice from "@/components/auth/InactiveAccountNotice";
 import { useAuth } from "@/lib/context/AuthContext";
 import { hasBookingInProgress } from "@/lib/utils/booking.utils";
 import type { LoginRequest } from "@/lib/types/auth.types";
@@ -57,6 +59,11 @@ function LoginContent() {
   });
   
   const [isLoading, setIsLoading] = useState(false);
+
+  // Set when a login is refused only because the account was never activated.
+  // Holds the address that was tried, so a fresh activation email can be sent
+  // without asking for it again.
+  const [inactiveAccountEmail, setInactiveAccountEmail] = useState("");
   
   const validateField = (name: string, value: string) => {
     switch (name) {
@@ -107,6 +114,7 @@ function LoginContent() {
     }
     
     setIsLoading(true);
+    setInactiveAccountEmail("");
 
     try {
       // Just call login endpoint
@@ -120,6 +128,16 @@ function LoginContent() {
         // navigation instead of flickering back to "Log in" while the
         // destination page loads.
         router.push(getPostLoginDestination());
+        return;
+      }
+
+      // The account exists and the password was right — it was simply never
+      // activated. That is recoverable, so offer a fresh activation email
+      // instead of an error the user can do nothing about.
+      if (isInactiveAccountError(result.error)) {
+        setInactiveAccountEmail(formData.email);
+        setErrors(prev => ({ ...prev, general: "" }));
+        setIsLoading(false);
         return;
       }
 
@@ -169,6 +187,10 @@ function LoginContent() {
           )}
 
           <ErrorAlert message={errors.general} />
+
+          {inactiveAccountEmail && (
+            <InactiveAccountNotice email={inactiveAccountEmail} />
+          )}
           
           <FormInput
             label="Email"

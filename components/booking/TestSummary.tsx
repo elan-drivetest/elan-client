@@ -203,7 +203,7 @@ export default function TestSummary({
     // price of the matching 30-minute lesson.
     if (preview.concession > 0) {
       breakdown.push({
-        label: "Long-trip credit",
+        label: "🎉 Long-trip credit",
         price: `- ${formatCurrency(preview.concession)}`,
         isDiscount: true,
       });

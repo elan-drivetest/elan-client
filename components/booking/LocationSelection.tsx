@@ -652,7 +652,7 @@ export default function LocationSelection({
             <div>
               <h4 className="font-medium text-sm text-amber-800">Prefer to be picked up?</h4>
               <p className="text-xs text-amber-700 mt-1">
-                We&apos;ll collect you from your address and bring you to the test
+                We&apos;ll pick you up from your address and bring you to the test
                 centre.
               </p>
             </div>

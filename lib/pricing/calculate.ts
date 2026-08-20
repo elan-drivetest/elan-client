@@ -72,6 +72,51 @@ export function findThirtyMinuteLesson(
   );
 }
 
+/** Seconds. Mock tests are untimed and carry `duration: null`. */
+const ONE_HOUR_LESSON_DURATION = 3600;
+
+/**
+ * The two add-ons a customer can pick on Step 3.
+ *
+ * Resolved STRUCTURALLY — by `type` plus `duration` — rather than by reading
+ * the name. An admin may rename these rows (`PUT /admin/settings/addons/:id`
+ * only protects the two 30-minute lessons, because the server's long-trip
+ * credit is keyed on those exact names), and a renamed row that no longer
+ * matched a hardcoded string used to resolve to `null`. That is silent: the
+ * card still lit up as selected, the preview priced the add-on at zero, and the
+ * server then charged its real price.
+ *
+ * The name prefixes are kept only as a fallback for catalogues whose durations
+ * were edited to something unexpected.
+ */
+export function findMockTestAddon(
+  addons: Addon[],
+  testType: TestType
+): Addon | null {
+  const forType = addonsForTestType(addons, testType);
+
+  return (
+    forType.find((addon) => !addon.duration) ??
+    forType.find((addon) => addon.name.toLowerCase().startsWith('mock test')) ??
+    null
+  );
+}
+
+export function findOneHourLessonAddon(
+  addons: Addon[],
+  testType: TestType
+): Addon | null {
+  const forType = addonsForTestType(addons, testType);
+
+  return (
+    forType.find((addon) => addon.duration === ONE_HOUR_LESSON_DURATION) ??
+    forType.find((addon) =>
+      addon.name.toLowerCase().startsWith('1 hour lesson')
+    ) ??
+    null
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Pickup fare
 // ---------------------------------------------------------------------------

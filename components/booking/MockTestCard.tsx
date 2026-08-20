@@ -4,7 +4,7 @@ import React from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
-import { TestType, Addon } from "@/lib/types/booking.types";
+import { TestType, Addon, formatPrice } from "@/lib/types/booking.types";
 
 interface MockTestCardProps {
   className?: string;
@@ -25,15 +25,18 @@ export default function MockTestCard({
   onAdd,
   variant = "default",
   testType,
+  addon = null,
   isLoading = false
 }: MockTestCardProps) {
-  
+
   // Get testType from props or fallback to G2
   const displayTestType = testType || 'G2';
-  
-  // Get mock test addon from the API response
 
-  // Get price from API or fallback
+  // Price comes from GET /addons, which is what an admin edits in
+  // Settings -> Pricing & payouts. Rendering nothing when the catalogue has not
+  // loaded is deliberate: a wrong price is worse than no price, and this card
+  // is the moment the customer decides to spend the money.
+  const priceLabel = addon ? formatPrice(addon.price) : null;
 
   if (variant === "compact") {
     return (
@@ -52,6 +55,9 @@ export default function MockTestCard({
             <h3 className={cn("font-medium", isAdded ? "text-[#0C8B44]" : "")}>
               {isAdded ? `Complete ${displayTestType} Mock Test Added` : "Complete Mock Test"}
             </h3>
+            {priceLabel && (
+              <p className="text-xs font-semibold text-[#0C8B44] mt-0.5">{priceLabel}</p>
+            )}
             <p className="text-xs text-gray-600 mt-1">
               {percentage}% of our customers choose this pass their exam at first chance
             </p>
@@ -78,6 +84,9 @@ export default function MockTestCard({
               <h3 className="font-medium text-[#0C8B44]">
                 Complete {displayTestType} Mock Test Added
               </h3>
+              {priceLabel && (
+                <p className="text-sm font-semibold text-[#0C8B44] mt-0.5">{priceLabel}</p>
+              )}
               <p className="text-sm text-gray-600 mt-1">
                 {percentage}% of our customers choose this pass their exam at first chance
               </p>
@@ -110,6 +119,9 @@ export default function MockTestCard({
                 <h3 className="font-medium text-[#0C8B44] text-xl">
                   Upgrade to a Complete {displayTestType} Mock Test
                 </h3>
+                {priceLabel && (
+                  <p className="text-lg font-semibold text-[#0C8B44] mt-1">{priceLabel}</p>
+                )}
                 <p className="text-gray-600 mt-1">
                   {percentage}% of our customers choose this pass their exam at first chance
                 </p>
@@ -117,10 +129,10 @@ export default function MockTestCard({
               
               <Button 
                 onClick={onAdd}
-                disabled={isLoading}
+                disabled={isLoading || !addon}
                 className="px-3 py-1 w-full cursor-pointer bg-black text-white rounded-md text-sm hover:bg-black/80 transition-colors disabled:opacity-50"
               >
-                🎉 {isLoading ? "Loading..." : "Upgrade to Mock Test"} 🎉
+                🎉 {isLoading || !addon ? "Loading..." : "Upgrade to Mock Test"} 🎉
               </Button>
             </div>
           </div>

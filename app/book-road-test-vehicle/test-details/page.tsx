@@ -13,7 +13,11 @@ import { useBooking } from "@/lib/context/BookingContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { FileText, CreditCard } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { addonsForTestType, findThirtyMinuteLesson } from "@/lib/pricing/calculate";
+import {
+  findMockTestAddon,
+  findOneHourLessonAddon,
+  findThirtyMinuteLesson,
+} from "@/lib/pricing/calculate";
 import { formatPrice } from "@/lib/types/booking.types";
 import PickupOptions from "@/components/booking/PickupOptions";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
@@ -87,21 +91,15 @@ export default function TestDetails() {
   const roadTestDocUrl: string | null = bookingState.documents?.roadTestFile ?? null;
   const licenseDocUrl: string | null = bookingState.documents?.licenseFile ?? null;
   
-  // Add-ons available for this booking's test type, filtered by `type` — the
-  // field the server keys off — rather than by matching words in the name.
-  const availableAddons = bookingState.testType
-    ? addonsForTestType(addons, bookingState.testType)
-    : [];
-
-  // The mock test for this test type. Both mock tests and lessons are seeded
-  // under LESSON_G / LESSON_G2, so the name is what separates them within a
-  // type; `duration: null` also distinguishes mock tests from lessons.
-  const getMockTestAddon = () =>
-    availableAddons.find(addon => addon.name.toLowerCase().startsWith('mock test')) ?? null;
-
-  // The 1-hour lesson for this test type.
-  const getDrivingLessonAddon = () =>
-    availableAddons.find(addon => addon.name.toLowerCase().startsWith('1 hour lesson')) ?? null;
+  // The two selectable add-ons for this booking's test type, resolved by the
+  // shared lookups in lib/pricing so Step 3 and the summary cannot disagree.
+  // Null until GET /addons has loaded.
+  const mockTestAddon = bookingState.testType
+    ? findMockTestAddon(addons, bookingState.testType)
+    : null;
+  const drivingLessonAddon = bookingState.testType
+    ? findOneHourLessonAddon(addons, bookingState.testType)
+    : null;
 
 
   // The selected centre, resolved once. This lookup used to be inlined in the
@@ -294,24 +292,31 @@ export default function TestDetails() {
   const handleSelectAddOn = (type: AddOnType) => {
     // Toggle: selecting the current add-on again clears it.
     const newAddOn = type === selectedAddOn ? null : type;
-    
-    console.log('✅ Setting new add-on:', newAddOn);
 
     // Get addon data for API integration
     let addonData = null;
     if (newAddOn === 'mock-test') {
-      addonData = getMockTestAddon();
+      addonData = mockTestAddon;
     } else if (newAddOn === 'driving-lesson') {
-      addonData = getDrivingLessonAddon();
+      addonData = drivingLessonAddon;
     }
-    
-    // Update booking state
-    updateBookingState({ 
+
+    // Refuse a selection we cannot price.
+    //
+    // Without this the card ticks, `selectedAddonData` stays null, the preview
+    // adds nothing, and the customer reaches payment believing the add-on was
+    // free — while `transformToApiFormat` still sends the add-on id and the
+    // server charges the real price. Showing the row as unavailable is the
+    // honest failure; silently free is not.
+    if (newAddOn && !addonData) {
+      console.warn('Add-on catalogue unavailable — refusing selection:', newAddOn);
+      return;
+    }
+
+    updateBookingState({
       selectedAddOn: newAddOn,
       selectedAddonData: addonData
     });
-    
-    console.log('🔄 Updated booking state with add-on:', { newAddOn, addonData });
   };
   
   const handleApplyPromo = (code: string) => {
@@ -456,7 +461,7 @@ export default function TestDetails() {
               isAdded={selectedAddOn === 'mock-test'}
               onAdd={() => handleSelectAddOn('mock-test')}
               testType={bookingState.testType || undefined}
-              addon={getMockTestAddon()}
+              addon={mockTestAddon}
               isLoading={isLoadingAddons}
             />
           </div>
@@ -467,6 +472,9 @@ export default function TestDetails() {
               description="One-on-one practice session with a professional instructor before your test"
               isSelected={selectedAddOn === 'driving-lesson'}
               onSelect={() => handleSelectAddOn('driving-lesson')}
+              testType={bookingState.testType || undefined}
+              addon={drivingLessonAddon}
+              isLoading={isLoadingAddons}
             />
           </div>
 

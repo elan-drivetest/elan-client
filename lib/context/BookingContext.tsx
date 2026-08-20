@@ -11,6 +11,7 @@ import {
   type BookingPricePreview,
 } from '@/lib/pricing/calculate';
 import { useAppConfig } from '@/lib/context/ConfigContext';
+import { useAuth } from '@/lib/context/AuthContext';
 import type { PickupPricingConfig } from '@/lib/config/app-config';
 import type {
   DriveTestCenter,
@@ -131,11 +132,29 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const isInitialized = useRef(false);
 
-  // API hooks for real-time data
-  // Test centers: Enabled on Step 1 (needed for dropdown)
-  // Addons: Disabled initially, only fetch on Step 3 or after auth
+  // API hooks for real-time data.
+  //
+  // Test centres are public and needed for the Step 1 dropdown, so they load
+  // immediately.
+  //
+  // The add-on catalogue is behind auth (GET /addons is 401 for anonymous
+  // visitors), so it loads as soon as the session resolves to a signed-in user.
+  // It used to be created with `enabled: false` and fetched from exactly ONE
+  // place — the login handler on Step 2 — which meant the catalogue was empty
+  // for everyone who did not type a password on that specific page in that
+  // specific session: anyone already signed in, anyone returning from the email
+  // confirmation link, and anyone who reloaded or deep-linked into Step 3.
+  //
+  // An empty catalogue is silent and expensive. Step 3 resolves the selected
+  // add-on out of it, so `selectedAddonData` came back null, the card still lit
+  // up as chosen, and the summary total never moved — the add-on looked free
+  // and was then billed by the server at its real price.
+  const { authStatus } = useAuth();
   const { centers: testCenters, loading: isLoadingCenters, refetch: refetchCenters } = useDriveTestCenters(true);
-  const { addons, loading: isLoadingAddons, refetch: refetchAddons } = useAddons(undefined, false);
+  const { addons, loading: isLoadingAddons, refetch: refetchAddons } = useAddons(
+    undefined,
+    authStatus === 'authenticated'
+  );
   const { createBooking: apiCreateBooking } = useBookingCreation();
 
   // Pickup fare tiers, from the app-wide config provider. Null until it loads,
