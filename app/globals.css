@@ -140,3 +140,29 @@
     font-family: var(--font-ibm-plex-sans-jp), sans-serif;
   }
 }
+
+/*
+ * iOS Safari (and some Android WebViews) auto-zoom the page when a focused
+ * text input's computed font-size is under 16px, then don't reliably zoom
+ * back out on blur — the page is left stuck zoomed in until the user pinches
+ * out manually. Several inputs across the app use `text-sm`/`text-xs`
+ * (14px/12px) unconditionally.
+ *
+ * The fix is to never let a focusable text field render under 16px on a
+ * mobile-width viewport, which stops the zoom from triggering at all rather
+ * than trying to manage the zoom-out after the fact. `maximum-scale`/
+ * `user-scalable=no` on the viewport meta tag is the other "fix" often
+ * suggested for this — deliberately not used here, since it disables
+ * pinch-zoom for everyone, including users who rely on it.
+ *
+ * Written unlayered so it wins over the `text-sm`/`text-xs` utility classes
+ * (Tailwind's own layers are always lower-priority than unlayered rules)
+ * without having to touch every input across the app individually.
+ */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
