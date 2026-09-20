@@ -322,7 +322,11 @@ export default function TestDetails() {
   const handleApplyPromo = (code: string) => {
     updateBookingState({ couponCode: code });
   };
-  
+
+  const handleRemovePromo = () => {
+    updateBookingState({ couponCode: undefined });
+  };
+
   const handleContinue = () => {
     // No document copy-back needed: the upload handlers write straight to
     // booking state, which is now the only place these URLs live.
@@ -559,6 +563,7 @@ export default function TestDetails() {
             testCentre={displayTestCentre}
             testCentreAddress={displayTestCentreAddress}
             onApplyPromo={handleApplyPromo}
+            onRemovePromo={handleRemovePromo}
             onRemoveAddOn={() => handleSelectAddOn(null)}
             hasAddOn={!!selectedAddOn}
             selectedAddOn={selectedAddOn}

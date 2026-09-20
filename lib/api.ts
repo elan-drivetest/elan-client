@@ -350,7 +350,7 @@ export const bookingApi = {
   getAddonById: (id: number) => bookingService.getAddonById(id),
   
   // Coupons
-  verifyCoupon: (couponCode: string) => bookingService.verifyCoupon(couponCode),
+  verifyCoupon: (couponCode: string, subtotal?: number) => bookingService.verifyCoupon(couponCode, subtotal),
   
   // Address Search
   searchAddresses: (query: string, limit?: number) => bookingService.searchAddresses(query, limit),

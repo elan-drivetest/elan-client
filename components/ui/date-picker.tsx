@@ -97,18 +97,21 @@ export function DatePicker({
     }
   };
 
+  const [open, setOpen] = React.useState(false);
+
   // Handle date selection with validation
   const handleDateSelect = (selectedDate: Date | undefined) => {
     if (!selectedDate || disabled) return;
-    
+
     // Double check if the selected date is valid
     if (!isDateDisabled(selectedDate)) {
       setDate(selectedDate);
+      setOpen(false);
     }
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

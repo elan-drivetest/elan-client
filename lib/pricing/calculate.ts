@@ -234,10 +234,12 @@ export function previewBookingPrice(args: {
  * The customer-visible saving on a booking that already exists.
  *
  * `base_price + pickup_price + addons_price` does NOT equal `total_price`
- * whenever a long-trip concession or a coupon applied, and `discount_amount` is
- * always null on the API (the real figure lives in `coupon_usages`, which no
- * customer endpoint exposes). So derive it from the components, and label it
- * generically — the number bundles concession and coupon together.
+ * whenever a long-trip concession or a coupon applied. `discount_amount` is
+ * now populated on new bookings with the coupon-only figure — prefer that and
+ * subtract it from this to isolate the long-trip credit. This function stays
+ * as the fallback for bookings created before that field existed, where
+ * `discount_amount` is `null` and the two can't be told apart, so this bundles
+ * them and is labelled generically wherever it's used alone.
  */
 export function deriveBookingAdjustment(booking: {
   base_price: number;

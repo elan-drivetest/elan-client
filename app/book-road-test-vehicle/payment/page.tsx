@@ -81,8 +81,11 @@ export default function Payment() {
   }, [bookingState.userDetails?.email, router]);
 
   const handleApplyPromo = (code: string) => {
-    console.log("Applying promo code:", code);
-    alert(`Promo code ${code} applied!`);
+    updateBookingState({ couponCode: code });
+  };
+
+  const handleRemovePromo = () => {
+    updateBookingState({ couponCode: undefined });
   };
 
   const handlePaymentSubmit = async () => {
@@ -376,6 +379,7 @@ export default function Payment() {
             testCentre={typeof bookingState.testCenter === 'object' ? bookingState.testCenter?.name ?? "" : bookingState.testCenter ?? ""}
             testCentreAddress={bookingState.testCenterAddress}
             onApplyPromo={handleApplyPromo}
+            onRemovePromo={handleRemovePromo}
             hasAddOn={!!bookingState.selectedAddOn}
             selectedAddOn={bookingState.selectedAddOn || null}
           />

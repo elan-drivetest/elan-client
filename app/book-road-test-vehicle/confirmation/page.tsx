@@ -43,6 +43,7 @@ export default function Confirmation() {
           addons_price: booking.addons_price,
           total_price: booking.total_price,
           coupon_code: booking.coupon_code,
+          discount_amount: booking.discount_amount,
         });
       }
     });

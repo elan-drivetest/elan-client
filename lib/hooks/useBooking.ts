@@ -164,7 +164,7 @@ export const useCouponVerification = () => {
   const [isVerified, setIsVerified] = useState(false);
 
   // FIXED: Return the actual coupon data instead of boolean
-  const verifyCoupon = useCallback(async (couponCode: string): Promise<Coupon | null> => {
+  const verifyCoupon = useCallback(async (couponCode: string, subtotal?: number): Promise<Coupon | null> => {
     if (!couponCode.trim()) {
       setError('Please enter a coupon code');
       return null;
@@ -176,8 +176,8 @@ export const useCouponVerification = () => {
     setIsVerified(false);
 
     try {
-      const response = await bookingApi.verifyCoupon(couponCode);
-      
+      const response = await bookingApi.verifyCoupon(couponCode, subtotal);
+
       if (response.success && response.data) {
         setCoupon(response.data);
         setIsVerified(true);

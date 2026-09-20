@@ -163,9 +163,12 @@ class BookingApiService {
   // COUPONS
   // ============================================================================
 
-  async verifyCoupon(couponCode: string): Promise<ApiResponse<Coupon>> {
+  async verifyCoupon(couponCode: string, subtotal?: number): Promise<ApiResponse<Coupon>> {
     try {
-      const requestData: CouponVerifyRequest = { code: couponCode };
+      const requestData: CouponVerifyRequest = {
+        code: couponCode,
+        ...(subtotal !== undefined ? { subtotal } : {}),
+      };
       const response = await this.apiClient.post<Coupon>('/coupons/verify', requestData);
       return this.createSuccessResponse(response.data, 'Coupon verified successfully');
     } catch (error) {

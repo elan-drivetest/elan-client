@@ -382,8 +382,10 @@ export function TimePicker({
     updateTime(currentHour, currentMinute, period);
   };
 
+  const [open, setOpen] = React.useState(false);
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -498,6 +500,17 @@ export function TimePicker({
                 );
               })}
             </div>
+          </div>
+
+          {/* Done button */}
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <Button
+              type="button"
+              className="w-full"
+              onClick={() => setOpen(false)}
+            >
+              Done
+            </Button>
           </div>
         </div>
       </PopoverContent>

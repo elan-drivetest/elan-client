@@ -50,7 +50,7 @@ interface RecentBookingResponse {
   status: "pending" | "confirmed" | "completed" | "cancelled" | "rescheduled" | "succeeded" | "expired";
   test_result?: "PASS" | "FAIL" | null;
   coupon_code?: string | null;
-  /** @deprecated Always null from the API. Use deriveBookingAdjustment(). */
+  /** `null` = no coupon, or a booking predating this field (unknown, not zero). */
   discount_amount?: number | null;
   is_rescheduled: boolean;
   previous_booking_id?: number;

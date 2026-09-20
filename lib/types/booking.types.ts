@@ -130,35 +130,49 @@ export interface AddonsResponse {
 // ============================================================================
 
 /**
- * A coupon as the CUSTOMER sees it (serialization group `me`).
+ * A coupon as the CUSTOMER sees it (serialization group `me`), from
+ * `POST /coupons/verify`.
  *
- * `discount` is deliberately typed as ambiguous: the server means percent when
- * `discount_type` is 'percentage' (or `is_failure_coupon` is set) and cents
- * otherwise — but `discount_type`, `min_purchase_amount`, `is_recurrent` and
- * `is_failure_coupon` are all stripped from this response, so the client cannot
- * tell which. Treating it as cents quoted a $0.10 saving on a 10% coupon.
+ * `discount_type`, `min_purchase_amount` and `expires_at` are now included —
+ * they used to be stripped from this response, which made `discount: 10`
+ * irreducibly ambiguous between "10 percent" and "10 cents" and quoted a
+ * $0.10 saving on a 10% coupon. Use `discount` + `discount_type` for the
+ * label only ("10% off" / "$15.00 off"); never derive an amount from them.
  *
- * Do not compute a discount from this. Show the coupon as accepted, send
- * `coupon_code` on create, and display the server's `total_price`.
+ * The `subtotal`/`discount_amount`/`total_after_discount`/`meets_minimum`
+ * block is only present when the request included `subtotal` — send it on
+ * every verify call (`base_price + pickup_price + addons_price`, in cents) and
+ * render `discount_amount` as the deduction. It comes from the same function
+ * the booking endpoint charges from; do not re-derive it.
  */
 export interface Coupon extends BaseEntity {
   code: string;
   name?: string;
   description?: string;
-  /** Percent OR cents — not determinable client-side. Display only. */
+  /** Percent when `discount_type` is 'percentage', cents when 'fixed'. Label only. */
   discount: number;
+  discount_type: 'percentage' | 'fixed';
+  /** Minimum order subtotal, in cents, for the coupon to apply. */
+  min_purchase_amount: number;
   start_date?: string;
-  expires_at?: string;
+  /** `null` means never expires. */
+  expires_at?: string | null;
+
+  // Present only when `subtotal` was sent with the verify request.
+  /** Echoes the `subtotal` sent, in cents. */
+  subtotal?: number;
+  /** Cents to deduct. This is the number to display. */
+  discount_amount?: number;
+  /** `subtotal - discount_amount`. */
+  total_after_discount?: number;
+  /** `false` when `subtotal` is below `min_purchase_amount` — not an error, but not applicable yet. */
+  meets_minimum?: boolean;
 }
 
 export interface CouponVerifyRequest {
   code: string;
-}
-
-export interface CouponVerifyResponse {
-  coupon: Coupon;
-  isValid: boolean;
-  message?: string;
+  /** `base_price + pickup_price + addons_price`, in cents. Optional, but send it on every call. */
+  subtotal?: number;
 }
 
 // ============================================================================
@@ -215,7 +229,12 @@ export interface Booking extends BaseEntity {
   status: BookingStatus;
   test_result: TestResult | null;
   coupon_code?: string;
-  discount_amount: number; // in cents
+  /**
+   * Cents saved by the coupon, in cents. `null` = no coupon applied, or a
+   * booking created before this field was populated (treat as "unknown", not
+   * zero). `0` = a coupon was applied but was worth nothing here.
+   */
+  discount_amount: number | null;
   is_rescheduled: boolean;
   previous_booking_id?: number;
   timezone: string;

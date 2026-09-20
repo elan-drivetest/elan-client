@@ -34,7 +34,11 @@ interface APIBooking {
   status: "pending" | "confirmed" | "completed" | "cancelled" | "rescheduled" | "succeeded" | "expired";
   test_result?: "PASS" | "FAIL" | null;
   coupon_code?: string | null;
-  /** @deprecated Always null from the API. Use deriveBookingAdjustment(). */
+  /**
+   * Cents saved by a coupon. `null` = no coupon, or a booking created before
+   * this field was populated (unknown, not zero) — fall back to
+   * deriveBookingAdjustment() for those.
+   */
   discount_amount?: number | null;
   is_rescheduled: boolean;
   timezone: string;
@@ -632,18 +636,36 @@ const BookingCard: React.FC<{
             </div>
           )}
           {/* The components above do NOT sum to total_price whenever a
-              long-trip credit or a coupon applied, and the API's
-              `discount_amount` is always null (the real figure lives in
-              coupon_usages, which no customer endpoint exposes). So derive the
-              gap. It bundles credit and coupon together, hence the plural
-              label. Reading discount_amount here meant this row never rendered
-              and the breakdown visibly failed to add up. */}
-          {deriveBookingAdjustment(booking) > 0 && (
-            <div className="flex justify-between text-green-600">
-              <span>Discounts {booking.coupon_code && `(${booking.coupon_code})`}</span>
-              <span>-{formatPrice(deriveBookingAdjustment(booking))}</span>
-            </div>
-          )}
+              long-trip credit or a coupon applied. `discount_amount` is now
+              populated on new bookings, so when it's a known number we split
+              the gap into the two things that can open it; a `null` (a
+              booking created before this field existed) falls back to one
+              bundled row, same as before. */}
+          {(() => {
+            const totalAdjustment = deriveBookingAdjustment(booking);
+            const hasKnownDiscount = typeof booking.discount_amount === "number";
+            const couponDiscount = hasKnownDiscount ? (booking.discount_amount as number) : 0;
+            const longTripCredit = hasKnownDiscount
+              ? Math.max(0, totalAdjustment - couponDiscount)
+              : 0;
+
+            return (
+              <>
+                {longTripCredit > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Long-trip credit</span>
+                    <span>-{formatPrice(longTripCredit)}</span>
+                  </div>
+                )}
+                {(hasKnownDiscount ? couponDiscount > 0 : totalAdjustment > 0) && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discounts {booking.coupon_code && `(${booking.coupon_code})`}</span>
+                    <span>-{formatPrice(hasKnownDiscount ? couponDiscount : totalAdjustment)}</span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
           <div className="flex justify-between font-medium border-t pt-2">
             <span>Total</span>
             <span>{formatPrice(booking.total_price)}</span>
