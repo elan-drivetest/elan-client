@@ -142,7 +142,7 @@ export default function SignupPage() {
       phone: undefined,
       marketing: undefined,
       // Submission is blocked below unless the consent box is ticked.
-      legal_acceptances: customerLegalAcceptances(),
+      legal_acceptances: await customerLegalAcceptances(),
       platform: "web",
     };
     

@@ -90,14 +90,41 @@ export interface LegalAcceptance {
   version: string;
 }
 
-/**
- * Payload for `legal_acceptances` on POST /auth/customer/email/register and
- * POST /bookings. The server stamps accepted_at, IP and user agent itself.
- * NOT YET SENT — wire it once the backend ships the field, or a strict
- * validator will reject the unknown property.
- */
-export const customerLegalAcceptances = (): LegalAcceptance[] =>
+/** What the page renders. Only a fallback for the payload — see below. */
+const localCustomerAcceptances = (): LegalAcceptance[] =>
   CUSTOMER_REQUIRED_DOCUMENTS.map((key) => ({
     document: API_DOCUMENT_KEY[key],
     version: LEGAL_DOCUMENTS[key].version,
   }));
+
+let currentVersions: Promise<LegalAcceptance[] | null> | null = null;
+
+/**
+ * Payload for `legal_acceptances` on POST /auth/customer/email/register and
+ * POST /bookings. The server stamps accepted_at, IP and user agent itself.
+ *
+ * Versions come from the backend's public GET /legal/documents?role=customer,
+ * not from LEGAL_DOCUMENTS: the server silently DROPS any version it doesn't
+ * consider current, so a page published ahead of the backend (privacy v1.1
+ * went live before the backend's v1.1) would otherwise record nothing. The
+ * local versions are only a fallback when that call fails — the server drops
+ * them harmlessly if they're wrong.
+ */
+export async function customerLegalAcceptances(): Promise<LegalAcceptance[]> {
+  // Lazy import keeps this module free of config at load time for server pages.
+  const { API_BASE_URL } = await import("@/lib/config/api");
+  currentVersions ??= fetch(`${API_BASE_URL}/legal/documents?role=customer`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((docs: unknown) =>
+      Array.isArray(docs)
+        ? docs
+            .filter((d): d is LegalAcceptance => typeof d?.document === "string" && typeof d?.version === "string")
+            .map(({ document, version }) => ({ document, version }))
+        : null
+    )
+    .catch(() => null);
+
+  const fromServer = await currentVersions;
+  if (!fromServer?.length) currentVersions = null; // retry next time
+  return fromServer?.length ? fromServer : localCustomerAcceptances();
+}

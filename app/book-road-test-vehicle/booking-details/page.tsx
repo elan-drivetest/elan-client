@@ -116,7 +116,7 @@ export default function BookingDetails() {
         phone: undefined,    // Not used by API but required by type
         marketing: undefined, // Not used by API but required by type
         // SignupForm only calls onSubmit once the required consent box is ticked.
-        legal_acceptances: customerLegalAcceptances(),
+        legal_acceptances: await customerLegalAcceptances(),
         platform: "web",
       };
 

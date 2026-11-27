@@ -114,7 +114,7 @@ export default function Payment() {
       
       // Use the BookingContext createBooking method
       // Consent ticked on this step is recorded atomically with the booking.
-      const result = await createBooking({ legal_acceptances: customerLegalAcceptances(), platform: "web" });
+      const result = await createBooking({ legal_acceptances: await customerLegalAcceptances(), platform: "web" });
       
       console.log("📊 Full API response:", result);
       
