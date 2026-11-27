@@ -1,4 +1,4 @@
-<!-- Version v1.1 = client-supplied v1 (PRIVACY POLICY.docx, received 2026-11-27) + Elan-drafted additions: §15 contact lines and §17 (instructors). The additions are DRAFT pending client sign-off; v1 wording is unchanged. -->
+<!-- Version v1.1 = client-supplied v1 (PRIVACY POLICY.docx, received 2026-11-27) + Elan-drafted §15 contact lines and §17 (instructors), approved by the lead 2026-11-27. v1 wording is unchanged. -->
 
 # PRIVACY POLICY
 ## 1. INTRODUCTION

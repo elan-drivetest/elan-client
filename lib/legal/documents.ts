@@ -44,8 +44,9 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocumentMeta> = {
   privacy: {
     key: "privacy",
     path: "/privacy",
-    file: "privacy-policy.v1.md",
-    version: "v1",
+    // v1.1 = client v1 + Elan-drafted §15 contact lines and §17 (instructors), approved by the lead.
+    file: "privacy-policy.v1.1.md",
+    version: "v1.1",
     title: "Privacy Policy",
     summary:
       "How Elan Road Test Car Solutions Inc. collects, uses, shares and protects your personal information.",
@@ -67,15 +68,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocumentMeta> = {
  * Drafts awaiting client sign-off, served at `<path>/draft`. Not linked from
  * the site, not indexed, never accepted by customers.
  */
-export const LEGAL_DRAFTS: Partial<Record<LegalDocumentKey, LegalDocumentMeta>> = {
-  // v1 wording unchanged + Elan-drafted §15 contact lines and §17 (instructors).
-  privacy: {
-    ...LEGAL_DOCUMENTS.privacy,
-    file: "privacy-policy.v1.1.md",
-    version: "v1.1",
-    lastUpdated: "Pending approval",
-  },
-};
+export const LEGAL_DRAFTS: Partial<Record<LegalDocumentKey, LegalDocumentMeta>> = {};
 
 /**
  * What a customer accepts at signup and at checkout. The Provider Agreement is
