@@ -64,6 +64,9 @@ const SELF_MANAGED_AUTH_ROUTES = [
   '/signup',
   '/forgot-password',
   '/password-change',
+  // Deleting the account ends the session on purpose; the page shows its own
+  // confirmation instead of being bounced to /login?expired=true.
+  '/delete-account',
 ];
 
 export function AuthProvider({ children }: { children: ReactNode }) {

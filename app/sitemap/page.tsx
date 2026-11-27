@@ -108,6 +108,8 @@ const groups: Group[] = [
     links: [
       { label: "Terms of Service", href: "/terms", description: "Booking rules, cancellations, and conduct." },
       { label: "Privacy Policy", href: "/privacy", description: "What we collect, how we use it, your rights." },
+      { label: "Provider Agreement", href: "/provider-agreement", description: "Terms for instructors and vehicle providers." },
+      { label: "Delete Your Account", href: "/delete-account", description: "How to delete your account and what happens to your data." },
       { label: "Sitemap", href: "/sitemap", description: "This page." },
     ],
   },

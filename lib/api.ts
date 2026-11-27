@@ -323,14 +323,14 @@ export const authApi = {
     }
   },
 
-  // Soft delete user account
+  // Delete (anonymise) the account. 422 { errors: { account: "hasActiveBookings" } }
+  // while a booking is confirmed or in progress — handleApiError() has friendly copy.
   deleteAccount: async (): Promise<ApiResponse> => {
     try {
       await api.delete('/auth/customer/me');
       return { success: true };
     } catch (error) {
-      const axiosError = error as AxiosError<ApiError>;
-      return { success: false, error: axiosError.response?.data };
+      return { success: false, error: toApiError(error, 'Failed to delete account') };
     }
   },
 };

@@ -2,7 +2,8 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react";
-import { User, Mail, Phone, MapPin, Lock, Camera, Eye, EyeOff } from "lucide-react";
+import { User, Mail, Phone, MapPin, Lock, Camera, Eye, EyeOff, Trash2 } from "lucide-react";
+import Link from "next/link";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Button } from "@/components/ui/button";
 import { ErrorAlert } from "@/components/ui/error-alert";
@@ -698,6 +699,21 @@ export default function Profile() {
             </form>
           </div>
         )}
+
+        {/* Danger zone */}
+        <div className="mt-12 border-t border-gray-200 pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-gray-900">Delete account</h2>
+            <p className="text-sm text-gray-600">Permanently delete your account and personal information.</p>
+          </div>
+          <Link
+            href="/delete-account"
+            className="inline-flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-700"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            Delete my account
+          </Link>
+        </div>
       </div>
     </div>
   );

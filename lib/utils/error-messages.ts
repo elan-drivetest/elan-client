@@ -38,6 +38,10 @@ const CODE_MESSAGES: Record<string, string> = {
   userNotFound:
     "We couldn't find your account. Please log out, log back in, and try again.",
 
+  // Account deletion — 422 while a booking is confirmed or in progress
+  hasActiveBookings:
+    "You can't delete your account while you have a confirmed or in-progress booking. Once it's completed or cancelled, you can delete your account.",
+
   // File uploads
   selectFile: "Please choose a file to upload.",
 
