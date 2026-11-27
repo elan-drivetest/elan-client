@@ -11,6 +11,7 @@ import { isValidCanadianPhone, toE164Canadian } from "@/lib/utils/phone.utils";
 import { authApi, handleApiError, validateRegistrationData } from "@/lib/api";
 import type { RegisterRequest } from "@/lib/types/auth.types";
 import LegalConsentCheckbox from "@/components/legal/LegalConsentCheckbox";
+import { customerLegalAcceptances } from "@/lib/legal/documents";
 import Checkbox from "@/components/booking/Checkbox";
 
 export default function SignupPage() {
@@ -139,7 +140,10 @@ export default function SignupPage() {
       phone_number: toE164Canadian(typeof formData.phone === 'string' ? formData.phone : '') || undefined,
       confirmPassword: "",
       phone: undefined,
-      marketing: undefined
+      marketing: undefined,
+      // Submission is blocked below unless the consent box is ticked.
+      legal_acceptances: customerLegalAcceptances(),
+      platform: "web",
     };
     
     // Validate all fields

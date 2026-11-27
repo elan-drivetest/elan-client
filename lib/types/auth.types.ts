@@ -8,6 +8,9 @@ export interface RegisterRequest {
   email: string;
   password: string;
   phone_number?: string;
+  /** Consent captured on the signup form; recorded in the same transaction as the account. */
+  legal_acceptances?: { document: string; version: string }[];
+  platform?: 'web';
 }
 
 export interface LoginRequest {

@@ -281,6 +281,9 @@ export interface CreateBookingRequest {
   coupon_code?: string;
   previous_booking_id?: number; // for rebookings
   timezone: string;
+  /** Consent captured on the payment step; recorded atomically with the booking. */
+  legal_acceptances?: { document: string; version: string }[];
+  platform?: 'web';
 }
 
 export interface BookingsResponse {

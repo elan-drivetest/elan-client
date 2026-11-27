@@ -12,6 +12,7 @@ import { CheckCircle, CreditCard, FileText, Loader2 } from "lucide-react";
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { formatCanadianPhoneDisplay } from "@/lib/utils/phone.utils";
 import LegalConsentCheckbox from "@/components/legal/LegalConsentCheckbox";
+import { customerLegalAcceptances } from "@/lib/legal/documents";
 
 const bookingSteps = [
   { id: 1, name: "Road Test Details", path: "/book-road-test-vehicle/road-test-details" },
@@ -112,7 +113,8 @@ export default function Payment() {
       console.log("🚀 Creating booking with data:", bookingState);
       
       // Use the BookingContext createBooking method
-      const result = await createBooking();
+      // Consent ticked on this step is recorded atomically with the booking.
+      const result = await createBooking({ legal_acceptances: customerLegalAcceptances(), platform: "web" });
       
       console.log("📊 Full API response:", result);
       

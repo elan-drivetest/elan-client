@@ -42,6 +42,12 @@ const CODE_MESSAGES: Record<string, string> = {
   hasActiveBookings:
     "You can't delete your account while you have a confirmed or in-progress booking. Once it's completed or cancelled, you can delete your account.",
 
+  // Legal acceptance (POST /bookings)
+  legalAcceptanceRequired:
+    "Please accept the Terms of Service and Privacy Policy to continue.",
+  legalVersionOutdated:
+    "Our Terms of Service or Privacy Policy have been updated. Please reload the page, review them and accept again.",
+
   // File uploads
   selectFile: "Please choose a file to upload.",
 

@@ -85,7 +85,7 @@ interface BookingContextType {
   calculatePricing: () => void;
 
   // API integration methods
-  createBooking: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  createBooking: (extras?: Pick<CreateBookingRequest, 'legal_acceptances' | 'platform'>) => Promise<{ success: boolean; data?: any; error?: string }>;
   validateBookingData: () => { isValid: boolean; errors: string[] };
   transformToApiFormat: () => CreateBookingRequest | null;
 
@@ -356,7 +356,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   };
 
   // Create booking with API integration
-  const createBooking = async (): Promise<{ success: boolean; data?: any; error?: string }> => {
+  const createBooking = async (
+    extras?: Pick<CreateBookingRequest, 'legal_acceptances' | 'platform'>
+  ): Promise<{ success: boolean; data?: any; error?: string }> => {
     try {
       // Validate data first
       const validation = validateBookingData();
@@ -379,7 +381,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       updateBookingState({ isCreatingBooking: true, bookingError: undefined });
 
       // Call API
-      const result = await apiCreateBooking(apiData);
+      const result = await apiCreateBooking({ ...apiData, ...extras });
 
       if (result.success && result.data) {
         updateBookingState({

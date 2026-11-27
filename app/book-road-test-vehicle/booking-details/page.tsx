@@ -15,6 +15,7 @@ import { isInactiveAccountError } from "@/lib/utils/error-messages";
 import InactiveAccountNotice from "@/components/auth/InactiveAccountNotice";
 import { toE164Canadian, formatCanadianPhoneDisplay } from "@/lib/utils/phone.utils";
 import type { RegisterRequest, LoginRequest } from "@/lib/types/auth.types";
+import { customerLegalAcceptances } from "@/lib/legal/documents";
 import { CheckCircle, LayoutDashboard, Loader2 } from "lucide-react";
 import { ErrorAlert } from "@/components/ui/error-alert";
 
@@ -113,7 +114,10 @@ export default function BookingDetails() {
         phone_number: toE164Canadian(data.phone) || undefined,
         confirmPassword: "", // Not used by API but required by type
         phone: undefined,    // Not used by API but required by type
-        marketing: undefined // Not used by API but required by type
+        marketing: undefined, // Not used by API but required by type
+        // SignupForm only calls onSubmit once the required consent box is ticked.
+        legal_acceptances: customerLegalAcceptances(),
+        platform: "web",
       };
 
       console.log('🚀 Registering user:', { email: apiData.email, name: apiData.full_name });
