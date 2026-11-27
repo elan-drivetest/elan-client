@@ -27,9 +27,8 @@ const HowItWorksPage = () => {
       description: "Select between meeting at the test centre or our convenient pickup service",
       icon: <MapPin className="h-8 w-8" />,
       details: [
-        "Meet at drive test centre - Lower cost option",
+        "Meet us at the DriveTest centre",
         "Pickup & dropoff service - Maximum convenience",
-        "Free dropoff for distances over 50km",
         "Available across all Ontario test centers"
       ]
     },
@@ -77,35 +76,29 @@ const HowItWorksPage = () => {
       details: [
         "Vehicle return handled for you",
         "Results discussion and feedback",
-        "25% discount if retake needed",
         "Celebrate your success!"
       ]
     }
   ];
 
-  const pricingTiers = [
+  const serviceOptions = [
     {
       title: "Meet at Test Centre",
-      price: "From $80",
-      description: "Budget-friendly option",
+      description: "Simple and straightforward",
       features: [
         "Meet instructor at test center",
-        "45-minute familiarization session", 
+        "45-minute familiarization session",
         "Fully insured vehicle",
-        "Professional instructor support",
-        "25% discount on retakes"
+        "Professional instructor support"
       ],
       popular: false
     },
     {
       title: "Pickup & Dropoff",
-      price: "From $80 + distance",
       description: "Maximum convenience",
       features: [
         "Pickup from your location",
-        "Free dropoff (50km+ distances)",
-        "Free 30-min lesson (50km+ distances)",
-        "Free 1-hour lesson (100km+ distances)",
+        "Dropoff after your test",
         "All test centre benefits included"
       ],
       popular: true
@@ -115,13 +108,11 @@ const HowItWorksPage = () => {
   const addOns = [
     {
       title: "Mock Test",
-      price: "G2: $54.99 | G: $64.99",
       description: "Complete practice test simulation",
       icon: <CheckCircle className="h-6 w-6" />
     },
     {
-      title: "1-Hour Driving Lesson", 
-      price: "G2: $50.00 | G: $60.00",
+      title: "1-Hour Driving Lesson",
       description: "One-on-one practice with instructor",
       icon: <Clock className="h-6 w-6" />
     }
@@ -241,11 +232,11 @@ const HowItWorksPage = () => {
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* Service Options */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Transparent Pricing
+            Choose Your Service
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Choose your service level and add optional extras to enhance your test experience
@@ -254,7 +245,7 @@ const HowItWorksPage = () => {
 
         {/* Main Service Options */}
         <div className="grid md:grid-cols-2 gap-8 mb-16">
-          {pricingTiers.map((tier, index) => (
+          {serviceOptions.map((tier, index) => (
             <div key={index} className={`relative rounded-2xl p-8 border-2 ${
               tier.popular 
                 ? 'border-[#0C8B44] bg-gradient-to-br from-green-50 to-white' 
@@ -270,7 +261,6 @@ const HowItWorksPage = () => {
               
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-bold mb-2">{tier.title}</h3>
-                <div className="text-3xl font-bold text-[#0C8B44] mb-2">{tier.price}</div>
                 <p className="text-gray-600">{tier.description}</p>
               </div>
 
@@ -308,42 +298,9 @@ const HowItWorksPage = () => {
                   </div>
                   <h4 className="text-lg font-semibold">{addon.title}</h4>
                 </div>
-                <p className="text-gray-600 mb-3">{addon.description}</p>
-                <div className="text-[#0C8B44] font-semibold">{addon.price}</div>
+                <p className="text-gray-600">{addon.description}</p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Distance-Based Perks */}
-      <section className="py-20 bg-gradient-to-r from-[#0C8B44] to-[#0A7A3C] text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-8">
-            Free Perks Based on Distance
-          </h2>
-          <p className="text-xl mb-12 opacity-90">
-            The further you are, the more value you get!
-          </p>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white/10 backdrop-blur rounded-xl p-6">
-              <div className="text-4xl mb-4">🚗</div>
-              <h3 className="text-xl font-bold mb-2">50km+</h3>
-              <p className="opacity-90">Free dropoff service after your test</p>
-            </div>
-            
-            <div className="bg-white/10 backdrop-blur rounded-xl p-6">
-              <div className="text-4xl mb-4">📚</div>
-              <h3 className="text-xl font-bold mb-2">50km+</h3>
-              <p className="opacity-90">Free 30-minute driving lesson</p>
-            </div>
-            
-            <div className="bg-white/10 backdrop-blur rounded-xl p-6">
-              <div className="text-4xl mb-4">🎓</div>
-              <h3 className="text-xl font-bold mb-2">100km+</h3>
-              <p className="opacity-90">Free 1-hour driving lesson</p>
-            </div>
           </div>
         </div>
       </section>

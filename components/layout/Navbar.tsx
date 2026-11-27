@@ -201,11 +201,9 @@ const Navbar = () => {
           <div className="max-w-7xl mx-auto px-10 flex items-center justify-center gap-x-2 gap-y-1 flex-wrap text-center">
             <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>
-              <span className="font-semibold">Free 1-hour driving lesson</span>
-              <span className="opacity-90"> on pickups 100&nbsp;km+</span>
+              <span className="font-semibold">Road test cars at every Ontario DriveTest centre</span>
               <span className="mx-2 opacity-60">•</span>
-              <span className="font-semibold">Free drop-off</span>
-              <span className="opacity-90"> at 50&nbsp;km+</span>
+              <span className="opacity-90">Pickup &amp; drop-off available</span>
             </span>
             <span className="inline-flex items-center gap-1 underline underline-offset-2">
               Book now

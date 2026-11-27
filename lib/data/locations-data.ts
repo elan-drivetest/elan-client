@@ -10,7 +10,6 @@ interface Service {
   icon: LucideIcon;
   title: string;
   description: string;
-  price: string;
 }
 
 interface Testimonial {
@@ -49,11 +48,11 @@ export const locationData: Record<string, LocationData> = {
         description: "We'll pick you up from anywhere in Brampton and drop you off after your test."
       },
       {
-        title: "Competitive Pricing",
-        description: "Best rates in Brampton with transparent pricing and no hidden fees."
+        title: "Fully Insured Vehicles",
+        description: "Every car is fully insured and fitted with dual brakes for your safety."
       },
       {
-        title: "Free 30-Minute Familiarization",
+        title: "Pre-Test Familiarization",
         description: "Get comfortable with the vehicle before your test."
       }
     ],
@@ -62,20 +61,17 @@ export const locationData: Record<string, LocationData> = {
       {
         icon: Car,
         title: "G2 Road Test Car Rental",
-        description: "Fully equipped vehicle for your G2 road test with dual brakes for safety.",
-        price: "From $80.00"
+        description: "Fully equipped vehicle for your G2 road test with dual brakes for safety."
       },
       {
         icon: Car,
         title: "G Road Test Car Rental",
-        description: "Premium vehicles for your full G license test with all safety features.",
-        price: "From $85.00"
+        description: "Premium vehicles for your full G license test with all safety features."
       },
       {
         icon: Clock,
         title: "Mock Road Test",
-        description: "Practice test with an instructor who will simulate the real test experience.",
-        price: "From $54.99"
+        description: "Practice test with an instructor who will simulate the real test experience."
       }
     ],
     testimonials: [
@@ -105,7 +101,7 @@ export const locationData: Record<string, LocationData> = {
       },
       {
         question: "Do you offer pickup service anywhere in Brampton?",
-        answer: "Yes, we offer pickup and drop-off service throughout Brampton and surrounding areas. Additional fees may apply based on distance."
+        answer: "Yes, we offer pickup and drop-off service throughout Brampton and surrounding areas."
       },
       {
         question: "How far in advance should I book a car for my road test in Brampton?",
@@ -113,7 +109,7 @@ export const locationData: Record<string, LocationData> = {
       },
       {
         question: "What happens if I fail my road test in Brampton?",
-        answer: "If you don't pass your test, we offer a 25% discount on your next booking with us. We'll also provide feedback on areas for improvement."
+        answer: "If you don't pass your test, we'll provide feedback on areas for improvement."
       }
     ]
   },
@@ -132,11 +128,11 @@ export const locationData: Record<string, LocationData> = {
         description: "We'll pick you up from your location and drop you off after your test."
       },
       {
-        title: "Competitive Pricing",
-        description: "Best rates with transparent pricing and no hidden fees."
+        title: "Fully Insured Vehicles",
+        description: "Every car is fully insured and fitted with dual brakes for your safety."
       },
       {
-        title: "Free 30-Minute Familiarization",
+        title: "Pre-Test Familiarization",
         description: "Get comfortable with the vehicle before your test."
       }
     ],
@@ -145,20 +141,17 @@ export const locationData: Record<string, LocationData> = {
       {
         icon: Car,
         title: "G2 Road Test Car Rental",
-        description: "Fully equipped vehicle for your G2 road test with dual brakes for safety.",
-        price: "From $80.00"
+        description: "Fully equipped vehicle for your G2 road test with dual brakes for safety."
       },
       {
         icon: Car,
         title: "G Road Test Car Rental",
-        description: "Premium vehicles for your full G license test with all safety features.",
-        price: "From $85.00"
+        description: "Premium vehicles for your full G license test with all safety features."
       },
       {
         icon: Clock,
         title: "Mock Road Test",
-        description: "Practice test with an instructor who will simulate the real test experience.",
-        price: "From $54.99"
+        description: "Practice test with an instructor who will simulate the real test experience."
       }
     ],
     testimonials: [
@@ -188,7 +181,7 @@ export const locationData: Record<string, LocationData> = {
       },
       {
         question: "Do you offer pickup service?",
-        answer: "Yes, we offer pickup and drop-off service throughout the area. Additional fees may apply based on distance."
+        answer: "Yes, we offer pickup and drop-off service throughout the area."
       },
       {
         question: "How far in advance should I book?",
@@ -196,7 +189,7 @@ export const locationData: Record<string, LocationData> = {
       },
       {
         question: "What happens if I fail my road test?",
-        answer: "If you don't pass your test, we offer a 25% discount on your next booking with us."
+        answer: "If you don't pass, we'll give you feedback on the areas to improve and help you book your next attempt."
       }
     ]
   }

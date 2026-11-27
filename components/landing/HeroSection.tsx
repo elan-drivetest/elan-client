@@ -77,7 +77,7 @@ const HeroSection = () => {
             </div>
           </div>
 
-          {/* Same Car, Better Value */}
+          {/* Same Car You Learned In */}
           <div className="flex items-start gap-2">
             <div className="flex-shrink-0 mt-1">
               <div className="w-4 h-4 rounded-full bg-[#0C8B44] flex items-center justify-center">
@@ -88,10 +88,10 @@ const HeroSection = () => {
             </div>
             <div>
               <p className="font-medium">
-                <span className="text-[#0C8B44]">Same Car, Better Value</span>
+                <span className="text-[#0C8B44]">Same Car You Learned In</span>
               </p>
               <p className="text-sm text-gray-700">
-                {"Drive the same instructor's car, but at a lower price."}
+                {"Take your test in your instructor's familiar car."}
               </p>
             </div>
           </div>

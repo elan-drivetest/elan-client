@@ -20,19 +20,11 @@ export interface FaqCategory {
 
 export const faqCategories: FaqCategory[] = [
   {
-    title: "Booking & Pricing",
+    title: "Booking & Payments",
     questions: [
       {
         question: "How does the booking process work?",
         answer: "Our booking process is simple and fast. You can book a car for your test online through our website in just a few minutes. Select your test location, date, and whether you need pickup service. You'll receive confirmation immediately and reminders closer to your test date."
-      },
-      {
-        question: "How much does it cost to rent a car for a road test?",
-        answer: "Our base rates start at $80 for G2 tests and $85 for G tests. Additional services such as pickup/dropoff are priced based on distance. We also offer add-ons like mock tests starting at $54.99 and practice sessions starting at $50. All pricing is transparent with no hidden fees."
-      },
-      {
-        question: "Do you offer any discounts?",
-        answer: "Yes, we offer several promotions throughout the year. We also have special discounts for students, first-time drivers, and group bookings. If you're booking from a distance of over 50km, you may qualify for free dropoff service and a free 30-minute driving lesson."
       },
       {
         question: "What types of payment do you accept?",
@@ -42,7 +34,7 @@ export const faqCategories: FaqCategory[] = [
         // Resolved at render time from the server's live refund settings — see
         // `answerKey` above. The windows and the partial rate are admin-tunable,
         // so this answer must never be a hardcoded sentence.
-        question: "Is there a cancellation fee?",
+        question: "What is your cancellation policy?",
         answerKey: "refund-ladder" as const
       }
     ]
@@ -64,7 +56,7 @@ export const faqCategories: FaqCategory[] = [
       },
       {
         question: "What happens if I fail my test?",
-        answer: "If you don't pass your test, we offer a 25% discount on your next booking with us. We understand that test nerves can affect performance, and we're committed to helping you succeed on your next attempt."
+        answer: "If you don't pass, we'll give you feedback on the areas to improve and help you book your next attempt. Test nerves are normal, and we're committed to helping you succeed next time."
       }
     ]
   },
@@ -73,15 +65,11 @@ export const faqCategories: FaqCategory[] = [
     questions: [
       {
         question: "Do you provide pickup and drop-off services?",
-        answer: "Yes, we offer pickup and drop-off services from your location to the test center and back. This service is available for an additional fee based on distance. For distances over 50km, we offer free drop-off service after your test."
+        answer: "Yes, we offer pickup and drop-off services from your location to the test center and back."
       },
       {
         question: "Which areas do you serve?",
         answer: "We provide road test car rental services across Ontario, including Toronto, Mississauga, Brampton, Ottawa, Hamilton, London, and many other locations. If you don't see your area listed, please contact us to check availability."
-      },
-      {
-        question: "How is the pickup fee calculated?",
-        answer: "The pickup fee is calculated based on the distance from our location to your pickup address. The first 50km is charged at $1/km, and any additional distance is charged at $0.50/km. For distances over 50km, we offer free drop-off service after your test."
       }
     ]
   },
@@ -98,7 +86,7 @@ export const faqCategories: FaqCategory[] = [
       },
       {
         question: "Will the vehicle have insurance for my test?",
-        answer: "Yes, all our vehicles come fully insured for your road test. The insurance coverage is included in your rental price, so you don't need to worry about obtaining additional coverage."
+        answer: "Yes, all our vehicles come fully insured for your road test. Insurance coverage is included with your rental, so you don't need to worry about obtaining additional coverage."
       }
     ]
   }

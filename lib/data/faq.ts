@@ -13,12 +13,12 @@ export const faqData = [
   {
     id: 3,
     question: "Do you provide pickup and drop-off services?",
-    answer: "Yes, we offer pickup and drop-off services from your location to the test center and back. This service is available for an additional fee based on distance. For distances over 50km, we offer free drop-off service after your test."
+    answer: "Yes, we offer pickup and drop-off services from your location to the test center and back."
   },
   {
     id: 4,
     question: "What happens if I fail my test?",
-    answer: "If you don't pass your test, we offer a 25% discount on your next booking with us. We understand that test nerves can affect performance, and we're committed to helping you succeed on your next attempt."
+    answer: "If you don't pass, we'll give you feedback on the areas to improve and help you book your next attempt. Test nerves are normal, and we're committed to helping you succeed next time."
   },
   {
     id: 5,

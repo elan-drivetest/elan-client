@@ -134,8 +134,7 @@ export default async function LocationPage({ params, searchParams }: LocationPag
                 <service.icon className="h-6 w-6 text-[#0C8B44]" />
               </div>
               <h3 className="font-bold mb-2">{service.title}</h3>
-              <p className="text-sm text-gray-600 mb-4">{service.description}</p>
-              <p className="text-[#0C8B44] font-bold">{service.price}</p>
+              <p className="text-sm text-gray-600">{service.description}</p>
             </div>
           ))}
         </div>
