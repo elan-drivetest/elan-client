@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Upload, AlertCircle, CheckCircle2, Loader2, FileCheck2, ExternalLink } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, Loader2, FileCheck2 } from "lucide-react";
 
 // An already-uploaded document, restored from booking state (e.g. when the
 // user navigates back from the Payment step).
@@ -106,8 +106,8 @@ export default function DocumentUpload({
   // latter is what keeps the document visible after navigating back from Payment.
   const displayName = fileName || existingFile?.name || null;
   const displaySize = formatFileSize(fileSize ?? existingFile?.size ?? undefined);
-  // Only the persisted file carries a viewable URL within this component.
-  const viewUrl = !fileName ? existingFile?.url : undefined;
+  // No "View" link: the persisted URL is the RAW upload URL (what POST /bookings
+  // must receive), and raw URLs don't open once the uploads bucket is private.
 
   return (
     <div className={cn("mb-6 p-5 border rounded-md", className)}>
@@ -138,16 +138,6 @@ export default function DocumentUpload({
           </div>
           {success && !isUploading && (
             <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
-          )}
-          {viewUrl && (
-            <a
-              href={viewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-green-700 hover:text-green-900 hover:underline"
-            >
-              View <ExternalLink className="h-3 w-3" />
-            </a>
           )}
         </div>
       ) : (

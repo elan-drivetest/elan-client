@@ -24,7 +24,7 @@ export default function Profile() {
   const { user, checkAuthStatus, isAuthenticated, isLoading } = useAuth();
   
   // File upload for profile picture
-  const { uploadProfilePicture, isUploading: isUploadingProfile, progress: uploadProgress, error: uploadError, success: uploadSuccess, uploadedFile, resetState: resetUploadState } = useFileUpload();
+  const { uploadProfilePicture, isUploading: isUploadingProfile, progress: uploadProgress, error: uploadError, success: uploadSuccess, resetState: resetUploadState } = useFileUpload();
   const profilePictureInputRef = useRef<HTMLInputElement>(null);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   
@@ -374,8 +374,10 @@ export default function Profile() {
     );
   }
 
-  // Get current profile picture (uploaded file, preview, or user's existing photo)
-  const currentProfilePicture = uploadedFile?.url || profilePreview || user.photo_url;
+  // Local preview first, then the photo_url from the latest /me (a presigned URL
+  // once the uploads bucket is private). Never the raw upload URL: it won't
+  // load from a private bucket.
+  const currentProfilePicture = profilePreview || user.photo_url;
   
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-white">

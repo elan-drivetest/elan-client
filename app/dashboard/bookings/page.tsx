@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { formatCanadianPhoneDisplay, toE164Canadian } from "@/lib/utils/phone.utils";
 import { getFriendlyErrorMessage } from "@/lib/utils/error-messages";
 import HelpCard from "@/components/booking/HelpCard";
+import BookingDocumentLink from "@/components/dashboard/BookingDocumentLink";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { bookingApi } from "@/lib/api";
@@ -574,26 +575,26 @@ const BookingCard: React.FC<{
               <div className="space-y-1">
                 {booking.road_test_doc_url && (
                   <div className="text-sm text-gray-600">
-                    <a 
-                      href={booking.road_test_doc_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
+                    <BookingDocumentLink
+                      bookingId={booking.id}
+                      field="road_test_doc_url"
+                      href={booking.road_test_doc_url}
                       className="text-[#0C8B44] hover:underline"
                     >
                       Road Test Document
-                    </a>
+                    </BookingDocumentLink>
                   </div>
                 )}
                 {booking.g1_license_doc_url && (
                   <div className="text-sm text-gray-600">
-                    <a 
-                      href={booking.g1_license_doc_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
+                    <BookingDocumentLink
+                      bookingId={booking.id}
+                      field="g1_license_doc_url"
+                      href={booking.g1_license_doc_url}
                       className="text-[#0C8B44] hover:underline"
                     >
                       G1 License Document
-                    </a>
+                    </BookingDocumentLink>
                   </div>
                 )}
               </div>
