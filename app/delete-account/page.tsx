@@ -52,15 +52,56 @@ export default function DeleteAccountPage() {
           <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
             <Smartphone className="h-5 w-5 text-[#0C8B44]" aria-hidden="true" /> Instructors and vehicle providers
           </h2>
-          <p className="text-gray-700">
-            Delete your account from your account settings in the Elan Instructor App, or send us a deletion
-            request from the email address or phone number registered to your account using the contact details
-            below. We&apos;ll confirm your identity before processing the request.
+          <p className="text-gray-700 mb-4">Delete your account in the Elan Instructor App:</p>
+          <ol className="list-decimal pl-6 space-y-1.5 text-gray-700 marker:text-[#0C8B44] marker:font-semibold mb-4">
+            <li>Open the Elan Instructor app.</li>
+            <li>Tap your profile photo (top right of the Dashboard).</li>
+            <li>Open <span className="font-medium">Profile Settings</span> and scroll to the bottom.</li>
+            <li>
+              Tap <span className="font-medium">Delete Account</span>, then confirm{" "}
+              <span className="font-medium">Delete account</span>.
+            </li>
+          </ol>
+          <p className="text-sm text-gray-600 mb-4">
+            You can&apos;t delete your account while you have a scheduled or in-progress ride. Finish or transfer
+            your upcoming rides first.
           </p>
+          <p className="text-gray-700">
+            Can&apos;t access the app? Send us a deletion request from the email address or phone number registered
+            to your account using the contact details below. We&apos;ll confirm your identity before processing it.
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-6 mt-6">
+            <div className="rounded-xl border border-gray-200 p-5">
+              <h3 className="font-semibold mb-3">Deleted or cleared</h3>
+              <ul className="list-disc pl-5 space-y-1.5 text-sm text-gray-700 marker:text-[#0C8B44]">
+                <li>Your name, email address, phone number and profile photo</li>
+                <li>Licence details</li>
+                <li>
+                  All uploaded documents (driver&apos;s licence, instructor licence, work eligibility, tax), removed
+                  from storage
+                </li>
+                <li>Vehicle details</li>
+                <li>Ride GPS and location history</li>
+                <li>Your login sessions, on every device</li>
+              </ul>
+            </div>
+            <div className="rounded-xl border border-gray-200 p-5">
+              <h3 className="font-semibold mb-3">Kept</h3>
+              <ul className="list-disc pl-5 space-y-1.5 text-sm text-gray-700 marker:text-[#0C8B44]">
+                <li>Ride records with their pay breakdown, for tax and legal obligations</li>
+                <li>Earnings, wallet and payout records</li>
+                <li>
+                  Your Stripe Connect link and payout status, so any earnings you&apos;re owed still settle. Your
+                  identity and banking details are held by Stripe, not Elan.
+                </li>
+              </ul>
+            </div>
+          </div>
         </section>
 
         <section id="what-happens" className="scroll-mt-28">
-          <h2 className="text-2xl font-bold mb-4">What happens to your data</h2>
+          <h2 className="text-2xl font-bold mb-4">Customers: what happens to your data</h2>
           <div className="grid sm:grid-cols-2 gap-6">
             <div className="rounded-xl border border-gray-200 p-5">
               <h3 className="font-semibold mb-3">Deleted or anonymised</h3>
