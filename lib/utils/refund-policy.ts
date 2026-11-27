@@ -47,13 +47,36 @@ export const formatHours = (hours: number): string =>
   `${hours} hour${hours === 1 ? '' : 's'}`;
 
 /**
- * The three bands as display rows, mirroring the server's
+ * When the partial band can't pay a partial amount, the ladder is really a
+ * single cutoff. Returns that cutoff (hours), or null when there's a genuine
+ * three-band ladder.
+ *  - 0% partial, or partial window empty (partial >= full) → cutoff at `full`
+ *    (this is ToS §13: under 48h is non-refundable)
+ *  - 100% partial → the partial band is a full refund → cutoff at `partial`
+ */
+function singleCutoff(ladder: RefundLadder): number | null {
+  if (ladder.partialPercentage <= 0 || ladder.partialHours >= ladder.fullHours) return ladder.fullHours;
+  if (ladder.partialPercentage >= 100) return ladder.partialHours;
+  return null;
+}
+
+/**
+ * The bands as display rows, mirroring the server's
  * `calculateRefundPercentage()`: >= full → 100%, >= partial → partial rate,
- * otherwise nothing.
+ * otherwise nothing. Collapses to two rows when there's no real partial band,
+ * rather than printing a "0% refund" row.
  */
 export function describeRefundLadder(
   ladder: RefundLadder
 ): Array<{ window: string; outcome: string }> {
+  const cutoff = singleCutoff(ladder);
+  if (cutoff !== null) {
+    return [
+      { window: `${formatHours(cutoff)} or more before your test`, outcome: 'Full refund' },
+      { window: `Less than ${formatHours(cutoff)} before`, outcome: 'Not refundable' },
+    ];
+  }
+
   return [
     {
       window: `${formatHours(ladder.fullHours)} or more before your test`,
@@ -74,6 +97,15 @@ export function describeRefundLadder(
 export function describeRefundLadderSentence(ladder: RefundLadder | null): string {
   if (!ladder) {
     return 'Your refund depends on how far ahead of your test you cancel. The exact amount is confirmed when you submit the request from your dashboard.';
+  }
+
+  const cutoff = singleCutoff(ladder);
+  if (cutoff !== null) {
+    return (
+      `Cancel ${formatHours(cutoff)} or more before your scheduled time for a full refund. ` +
+      `Cancellations less than ${formatHours(cutoff)} before are not refundable, and no-shows are charged ` +
+      `the full amount. Your exact refund amount is confirmed when you submit the request from your dashboard.`
+    );
   }
 
   return (
