@@ -8,7 +8,31 @@ import { Button } from "@/components/ui/button";
 import { locations } from "@/lib/data/locations";
 import LocationsDropdown from "./LocationsDropdown";
 import { useAuth } from "@/lib/context/AuthContext";
-import { ChevronDown, User, LogOut, LayoutDashboard, Sparkles, ArrowRight, Menu, X } from "lucide-react";
+import { ChevronDown, User, LogOut, LayoutDashboard, Sparkles, ArrowRight, Menu, X, Calendar } from "lucide-react";
+
+const MOBILE_PAGE_LINKS = [
+  { href: "/how-it-works", label: "How It Works" },
+  { href: "/locations", label: "Our Locations" },
+  { href: "/contact-us", label: "Contact Us" },
+  { href: "/faq", label: "FAQ" },
+  { href: "https://blog.elanroadtestrental.ca/", label: "Blogs" },
+];
+
+// Same order as the dashboard's own tabs.
+const MOBILE_DASHBOARD_LINKS = [
+  { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+  { href: "/dashboard/bookings", label: "My Bookings", Icon: Calendar },
+  { href: "/dashboard/profile", label: "Profile", Icon: User },
+];
+
+const mobileLinkClass =
+  "flex items-center gap-2 px-2 py-3 text-lg font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors";
+
+function MobileMenuHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">{children}</h3>
+  );
+}
 import { getCookie, setCookie } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -292,77 +316,37 @@ const Navbar = () => {
                 </SheetTitle>
               </SheetHeader>
 
-              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-                <Link
-                  href="/how-it-works"
-                  onClick={closeMobileMenu}
-                  className="block px-2 py-3 text-lg font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
-                >
-                  How It Works
-                </Link>
-                <Link
-                  href="/locations"
-                  onClick={closeMobileMenu}
-                  className="block px-2 py-3 text-lg font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
-                >
-                  Our Locations
-                </Link>
-                <Link
-                  href="/contact-us"
-                  onClick={closeMobileMenu}
-                  className="block px-2 py-3 text-lg font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
-                >
-                  Contact Us
-                </Link>
-                <Link
-                  href="/faq"
-                  onClick={closeMobileMenu}
-                  className="block px-2 py-3 text-lg font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
-                >
-                  FAQ
-                </Link>
-                <Link
-                  href="https://blog.elanroadtestrental.ca/"
-                  onClick={closeMobileMenu}
-                  className="block px-2 py-3 text-lg font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
-                >
-                  Blogs
-                </Link>
+              <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+                <nav aria-label="Pages">
+                  <MobileMenuHeading>Pages</MobileMenuHeading>
+                  <div className="flex flex-col gap-1">
+                    {MOBILE_PAGE_LINKS.map(({ href, label }) => (
+                      <Link key={href} href={href} onClick={closeMobileMenu} className={mobileLinkClass}>
+                        {label}
+                      </Link>
+                    ))}
+                  </div>
+                </nav>
 
                 {isAuthenticated && user && (
-                  <>
-                    <div className="my-2 border-t" />
-                    <Link
-                      href="/dashboard"
-                      onClick={closeMobileMenu}
-                      className="flex items-center gap-2 px-2 py-3 text-lg font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
-                    >
-                      <LayoutDashboard className="h-5 w-5" />
-                      Dashboard
-                    </Link>
-                    <Link
-                      href="/dashboard/profile"
-                      onClick={closeMobileMenu}
-                      className="flex items-center gap-2 px-2 py-3 text-lg font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
-                    >
-                      <User className="h-5 w-5" />
-                      Profile
-                    </Link>
-                    <Link
-                      href="/dashboard/bookings"
-                      onClick={closeMobileMenu}
-                      className="flex items-center gap-2 px-2 py-3 text-lg font-medium text-gray-700 rounded-md hover:text-[#0C8B44] hover:bg-gray-50 transition-colors"
-                    >
-                      <LayoutDashboard className="h-5 w-5" />
-                      My Bookings
-                    </Link>
-                  </>
+                  <nav aria-label="Dashboard" className="border-t pt-5">
+                    <MobileMenuHeading>Dashboard</MobileMenuHeading>
+                    <div className="flex flex-col gap-1">
+                      {MOBILE_DASHBOARD_LINKS.map(({ href, label, Icon }) => (
+                        <Link key={href} href={href} onClick={closeMobileMenu} className={mobileLinkClass}>
+                          <Icon className="h-5 w-5" aria-hidden="true" />
+                          {label}
+                        </Link>
+                      ))}
+                    </div>
+                  </nav>
                 )}
               </div>
 
-              {/* Actions pinned to the bottom of the sheet */}
-              <div className="border-t px-4 py-4 space-y-2">
-                <Link href="/book-road-test-vehicle/road-test-details" onClick={closeMobileMenu}>
+              {/* Actions pinned to the bottom of the sheet. Flex gap, not space-y:
+                  the <Link> wrappers are inline, so margins on them collapse to nothing. */}
+              <div className="border-t px-4 py-4 flex flex-col gap-3">
+                <Link href="/book-road-test-vehicle/road-test-details" onClick={closeMobileMenu} className="block">
                   <Button
                     size="lg"
                     className="w-full bg-[#0C8B44] hover:bg-[#0C8B44]/90 text-white"
@@ -387,12 +371,12 @@ const Navbar = () => {
                   </Button>
                 ) : (
                   <>
-                    <Link href="/login" onClick={closeMobileMenu}>
+                    <Link href="/login" onClick={closeMobileMenu} className="block">
                       <Button size="lg" variant="outline" className="w-full">
                         Log in
                       </Button>
                     </Link>
-                    <Link href="/signup" onClick={closeMobileMenu}>
+                    <Link href="/signup" onClick={closeMobileMenu} className="block">
                       <Button
                         size="lg"
                         className="w-full bg-[#0C8B44] hover:bg-[#0C8B44]/90 text-white"
