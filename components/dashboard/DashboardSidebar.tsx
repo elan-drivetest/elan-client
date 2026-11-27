@@ -19,14 +19,16 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ href, icon, text, isActive })
     <Link 
       href={href} 
       className={cn(
-        "flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0",
+        // Mobile: equal-width, centred tabs. Desktop: left-aligned sidebar rows.
+        "flex min-w-0 items-center justify-center md:justify-start gap-2 md:gap-3 px-2 md:px-4 py-3 rounded-md text-sm font-medium transition-colors whitespace-nowrap",
         isActive
           ? "bg-[#0C8B44]/10 text-[#0C8B44]"
           : "text-gray-700 hover:bg-gray-100"
       )}
     >
-      {icon}
-      {text}
+      {/* At ≤379px a third of the width can't fit icon + "Dashboard"; keep the label. */}
+      <span className="shrink-0 max-[379px]:hidden" aria-hidden="true">{icon}</span>
+      <span className="truncate">{text}</span>
     </Link>
   );
 };
@@ -54,9 +56,9 @@ export default function DashboardSidebar() {
 
   return (
     <div className="w-full md:w-52 flex-shrink-0 bg-white border-b md:border-b-0 md:border-r border-gray-200">
-      {/* Mobile: horizontal scrollable tab bar. Desktop: sticky vertical sidebar
-          offset below the (variable-height) global navbar. */}
-      <nav className="flex md:block gap-2 md:gap-0 md:space-y-2 p-3 md:p-4 overflow-x-auto md:overflow-visible md:sticky md:top-[calc(var(--navbar-height,96px)+1rem)]">
+      {/* Mobile: three equal-width tabs spanning the full width. Desktop: sticky
+          vertical sidebar offset below the (variable-height) global navbar. */}
+      <nav className="grid grid-cols-3 md:block gap-2 md:gap-0 md:space-y-2 p-3 md:p-4 md:sticky md:top-[calc(var(--navbar-height,96px)+1rem)]">
         {routes.map((route) => (
           <SidebarLink 
             key={route.href}
