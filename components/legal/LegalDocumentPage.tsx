@@ -11,7 +11,6 @@ import type { Metadata } from "next";
 import { FileText, Mail, Phone, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  LEGAL_LAST_UPDATED,
   versionLabel,
   type LegalDocumentMeta,
 } from "@/lib/legal/documents";
@@ -80,11 +79,25 @@ function Block({ block }: { block: LegalBlock }) {
   }
 }
 
-export default function LegalDocumentPage({ doc }: { doc: LegalDocumentMeta }) {
+export const legalDraftMetadata = (doc: LegalDocumentMeta): Metadata => ({
+  title: `DRAFT ${doc.title} | Elan Road Test Rental`,
+  robots: { index: false, follow: false },
+});
+
+export default function LegalDocumentPage({ doc, draft = false }: { doc: LegalDocumentMeta; draft?: boolean }) {
   const { intro, sections } = loadLegalDocument(doc.file);
 
   return (
     <main className="bg-white">
+      {draft && (
+        <div role="note" className="bg-amber-100 border-b border-amber-300 text-amber-900 text-sm text-center px-4 py-3">
+          <strong>Draft for review — not in effect.</strong> The current version is at{" "}
+          <Link href={doc.path} className="underline underline-offset-2">
+            {doc.path}
+          </Link>
+          .
+        </div>
+      )}
       {/* Hero */}
       <section className="bg-[#0C8B44]/5 py-14 md:py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
@@ -94,7 +107,7 @@ export default function LegalDocumentPage({ doc }: { doc: LegalDocumentMeta }) {
           <h1 className="text-3xl md:text-5xl font-bold mb-5">{doc.title}</h1>
           <p className="text-base md:text-lg text-gray-700 mb-5 max-w-2xl mx-auto">{doc.summary}</p>
           <p className="text-sm text-gray-500">
-            {versionLabel(doc.version)} · Last updated {LEGAL_LAST_UPDATED}
+            {versionLabel(doc.version)} · Last updated {doc.lastUpdated}
           </p>
         </div>
       </section>

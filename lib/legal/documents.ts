@@ -5,8 +5,13 @@
 // markup (headings, bullets) was added. The website copy is canonical.
 //
 // Changing a document's wording means a NEW version: add `<doc>.v2.md`, bump
-// `version` here, and update LEGAL_LAST_UPDATED. Customers accept a specific
-// version, so never edit a published version's file in place.
+// `version` and `lastUpdated` here. Customers accept a specific version, so
+// never edit a published version's file in place — and tell the backend first:
+// it validates the version string customers send.
+//
+// Unapproved wording goes in LEGAL_DRAFTS, which renders at <path>/draft
+// (noindex, with a draft banner) for sign-off. Approving a draft = moving its
+// entry into LEGAL_DOCUMENTS.
 //
 // URLs and section anchors (`#section-13-2`) are deep-linked from the
 // instructor app — keep both stable.
@@ -21,10 +26,9 @@ export interface LegalDocumentMeta {
   title: string;
   /** Short description for <meta> and the page hero. Not part of the legal text. */
   summary: string;
+  /** Publish date of this version. Shown as "Version 1 · Last updated <date>". */
+  lastUpdated: string;
 }
-
-/** Set on go-live day. Shown as "Version 1 · Last updated <date>". */
-export const LEGAL_LAST_UPDATED = "November 27, 2026";
 
 export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocumentMeta> = {
   terms: {
@@ -35,6 +39,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocumentMeta> = {
     title: "Terms of Service",
     summary:
       "The terms that govern bookings, vehicle use, payments, cancellations and refunds with Elan Road Test Car Solutions Inc.",
+    lastUpdated: "November 27, 2026",
   },
   privacy: {
     key: "privacy",
@@ -44,6 +49,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocumentMeta> = {
     title: "Privacy Policy",
     summary:
       "How Elan Road Test Car Solutions Inc. collects, uses, shares and protects your personal information.",
+    lastUpdated: "November 27, 2026",
   },
   provider: {
     key: "provider",
@@ -53,6 +59,21 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKey, LegalDocumentMeta> = {
     title: "Independent Vehicle Provider Agreement",
     summary:
       "The agreement between Elan and the driving instructors and vehicle providers registered in the Elan Instructor App.",
+    lastUpdated: "November 27, 2026",
+  },
+};
+
+/**
+ * Drafts awaiting client sign-off, served at `<path>/draft`. Not linked from
+ * the site, not indexed, never accepted by customers.
+ */
+export const LEGAL_DRAFTS: Partial<Record<LegalDocumentKey, LegalDocumentMeta>> = {
+  // v1 wording unchanged + Elan-drafted §15 contact lines and §17 (instructors).
+  privacy: {
+    ...LEGAL_DOCUMENTS.privacy,
+    file: "privacy-policy.v1.1.md",
+    version: "v1.1",
+    lastUpdated: "Pending approval",
   },
 };
 
