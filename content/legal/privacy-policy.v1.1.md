@@ -323,7 +323,7 @@ We use Provider information to:
 - Support safety and incident handling.
 - Verify Provider identity, licensing, and eligibility.
 ### 17.3 How We Share Provider Information
-- With customers: the Provider’s name, vehicle details, and the contact details needed for the customer’s booking.
+- With customers: the Provider’s full name, telephone number, and email address, on the customer’s own bookings. A Provider’s live location is not shown to customers.
 - With Stripe: Provider payouts are made through Stripe Connect. Stripe collects identity information (which may include Social Insurance Number and date of birth) and banking details directly through its own hosted onboarding. Elan stores only the Stripe account identifier and payout status and does not store Provider banking details.
 - With hosting providers: Elan’s systems and files are hosted on Amazon Web Services (AWS).
 Elan does not sell Provider location information and does not use it for advertising.
