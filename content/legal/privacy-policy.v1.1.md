@@ -328,8 +328,9 @@ We use Provider information to:
 - With hosting providers: Elan’s systems and files are hosted on Amazon Web Services (AWS).
 Elan does not sell Provider location information and does not use it for advertising.
 ### 17.4 Retention and Deletion
+While a Provider account is active, location history and uploaded documents are kept until the account is deleted.
 Providers may delete their account in the Instructor App (Profile Settings → Delete Account) or by following the instructions at https://www.elanroadtestrental.ca/delete-account#instructors.
-When a Provider account is deleted, Elan deletes the Provider’s name, email address, telephone number, profile photo, licence details, all uploaded documents (including the stored files), vehicle details, and location history. The email address may then be used to register a new account.
-Ride, earnings, and payout records are retained as necessary for tax, accounting, and legal purposes, and any earnings owed to the Provider are still paid.
+When a Provider account is deleted, Elan deletes the Provider’s name, email address, telephone number, profile photo, licence details, all uploaded documents (including the stored files and all stored versions of them), vehicle details, and location history. The email address may then be used to register a new account.
+Ride, earnings, payment, and payout records are kept after deletion in de-identified form for at least 6 years, as required by Canadian tax law, and any earnings owed to the Provider are still paid.
 ### 17.5 Customer Information Received by Providers
 Providers receive customer information, including the customer’s name, telephone number, driver’s licence photograph, and pickup details, to fulfil a booking. Providers may use customer information only for the booking for which it was provided, as set out in the Elan Independent Vehicle Provider Agreement.
