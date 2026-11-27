@@ -10,6 +10,8 @@ import PhoneInput from "@/components/shared/PhoneInput";
 import { isValidCanadianPhone, toE164Canadian } from "@/lib/utils/phone.utils";
 import { authApi, handleApiError, validateRegistrationData } from "@/lib/api";
 import type { RegisterRequest } from "@/lib/types/auth.types";
+import LegalConsentCheckbox from "@/components/legal/LegalConsentCheckbox";
+import Checkbox from "@/components/booking/Checkbox";
 
 export default function SignupPage() {
   const [formData, setFormData] = useState<RegisterRequest>({
@@ -18,7 +20,7 @@ export default function SignupPage() {
     full_name: "",
     password: "",
     confirmPassword: "",
-    marketing: true
+    marketing: false // CASL: marketing consent must be an active opt-in, never pre-ticked
   });
   
   const [errors, setErrors] = useState({
@@ -38,6 +40,10 @@ export default function SignupPage() {
     confirmPassword: false
   });
   
+  // Required consent to ToS + Privacy. Never pre-ticked.
+  const [legalAccepted, setLegalAccepted] = useState(false);
+  const [legalError, setLegalError] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isResendingEmail, setIsResendingEmail] = useState(false);
@@ -158,8 +164,10 @@ export default function SignupPage() {
       confirmPassword: true
     });
     
+    setLegalError(legalAccepted ? "" : "Please accept the Terms of Service and Privacy Policy to continue.");
+
     // Check if there are any validation errors
-    if (!clientValidation.isValid || confirmPasswordError) {
+    if (!clientValidation.isValid || confirmPasswordError || !legalAccepted) {
       return;
     }
     
@@ -332,24 +340,26 @@ export default function SignupPage() {
           />
           
           {/* Marketing consent */}
-          <div className="flex items-start">
-            <div className="flex items-center h-5">
-              <input
-                id="marketing"
-                name="marketing"
-                type="checkbox"
-                checked={formData.marketing}
-                onChange={handleChange}
-                className="h-4 w-4 text-[#0C8B44] focus:ring-[#0C8B44] border-gray-300 rounded"
-              />
-            </div>
-            <div className="ml-3 text-sm">
-              <label htmlFor="marketing" className="text-gray-600">
-                Get emails and text messages from Elan about promotions, new service offerings, and company updates. You can unsubscribe at any time.
-              </label>
-            </div>
+          <div>
+            <Checkbox
+              id="marketing"
+              name="marketing"
+              checked={!!formData.marketing}
+              onChange={handleChange}
+              label="Get emails and text messages from Elan about promotions, new service offerings, and company updates. You can unsubscribe at any time."
+            />
           </div>
           
+          <LegalConsentCheckbox
+            id="signup-page-legal-consent"
+            checked={legalAccepted}
+            onChange={(checked) => {
+              setLegalAccepted(checked);
+              if (checked) setLegalError("");
+            }}
+            error={legalError}
+          />
+
           {/* Create account button */}
           <div>
             <button
@@ -369,18 +379,6 @@ export default function SignupPage() {
           </div>
         </form>
         
-        <p className="mt-2 text-left text-sm text-gray-600">
-          {"By creating an account, you agree to Elan's"}{" "}
-          <Link href="/terms" className="font-medium text-[#0C8B44] hover:text-[#0A7A3C]">
-            Terms of Service
-          </Link>{" "}
-          and{" "}
-          <Link href="/privacy" className="font-medium text-[#0C8B44] hover:text-[#0A7A3C]">
-            Privacy Policy
-          </Link>
-          .
-        </p>
-
         <Separator />
         
         <p className="text-left text-sm text-gray-600">

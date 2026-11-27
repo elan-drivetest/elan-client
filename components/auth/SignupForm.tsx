@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState } from "react";
-import Link from "next/link";
 import FormInput from "@/components/booking/FormInput";
+import LegalConsentCheckbox from "@/components/legal/LegalConsentCheckbox";
 import Checkbox from "@/components/booking/Checkbox";
 import PhoneInput from "@/components/shared/PhoneInput";
 import { formatCanadianPhone, isValidCanadianPhone } from "@/lib/utils/phone.utils";
@@ -37,10 +37,14 @@ export default function SignupForm({
     fullName: initialValues.fullName || "",
     password: initialValues.password || "",
     confirmPassword: initialValues.confirmPassword || "",
-    marketing: initialValues.marketing !== undefined ? initialValues.marketing : true,
+    // CASL: marketing consent must be an active opt-in, never pre-ticked
+    marketing: initialValues.marketing ?? false,
   });
   
   const [errors, setErrors] = useState<Partial<SignupFormData>>({});
+  // Required consent to ToS + Privacy. Never pre-ticked; onSubmit only fires once it's given.
+  const [legalAccepted, setLegalAccepted] = useState(false);
+  const [legalError, setLegalError] = useState("");
   const [touched, setTouched] = useState<Record<keyof SignupFormData, boolean>>({
     email: false,
     phone: false,
@@ -134,8 +138,11 @@ export default function SignupForm({
       marketing: true,
     });
 
+    const legalMissing = !legalAccepted;
+    setLegalError(legalMissing ? "Please accept the Terms of Service and Privacy Policy to continue." : "");
+
     // Check if there are any errors
-    if (Object.values(newErrors).some((error) => error !== "")) {
+    if (legalMissing || Object.values(newErrors).some((error) => error !== "")) {
       console.log("Form has errors");
       return;
     }
@@ -221,24 +228,23 @@ export default function SignupForm({
         />
       )}
 
+      <LegalConsentCheckbox
+        id="signup-legal-consent"
+        checked={legalAccepted}
+        onChange={(checked) => {
+          setLegalAccepted(checked);
+          if (checked) setLegalError("");
+        }}
+        error={legalError}
+        className="mt-2"
+      />
+
       <button
         type="submit"
         className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#0C8B44] hover:bg-[#0A7A3C] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0C8B44]"
       >
         {buttonText}
       </button>
-
-      <p className="mt-2 text-sm text-gray-600">
-        {"By creating an account, you agree to Elan's"}{" "}
-        <Link href="/terms" className="font-medium text-[#0C8B44] hover:text-[#0A7A3C]">
-          Terms of Service
-        </Link>{" "}
-        and{" "}
-        <Link href="/privacy" className="font-medium text-[#0C8B44] hover:text-[#0A7A3C]">
-          Privacy Policy
-        </Link>
-        .
-      </p>
     </form>
   );
 }

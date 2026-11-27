@@ -11,6 +11,7 @@ import PickupOptions from "@/components/booking/PickupOptions";
 import { CheckCircle, CreditCard, FileText, Loader2 } from "lucide-react";
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { formatCanadianPhoneDisplay } from "@/lib/utils/phone.utils";
+import LegalConsentCheckbox from "@/components/legal/LegalConsentCheckbox";
 
 const bookingSteps = [
   { id: 1, name: "Road Test Details", path: "/book-road-test-vehicle/road-test-details" },
@@ -32,6 +33,10 @@ export default function Payment() {
   } = useBooking();
   
   const [isProcessing, setIsProcessing] = useState(false);
+  // Consent is given per booking at checkout (ToS §20.9), so it's deliberately
+  // local and un-persisted: every booking — including by customers who signed
+  // up before v1 — needs a fresh tick.
+  const [legalAccepted, setLegalAccepted] = useState(false);
 
   // Use refs to prevent infinite re-renders
   const hasSetCurrentStep = useRef(false);
@@ -89,6 +94,8 @@ export default function Payment() {
   };
 
   const handlePaymentSubmit = async () => {
+    if (!legalAccepted) return; // belt-and-braces; the button is disabled until accepted
+
     // Clear any previous booking errors first
     updateBookingState({ bookingError: undefined });
     
@@ -256,8 +263,9 @@ export default function Payment() {
   // Check if all required data is available
   const hasRequiredDocuments = bookingState.documents?.roadTestFile && 
                                bookingState.documents?.licenseFile;
-  const canSubmitBooking = hasRequiredDocuments && 
-                          (isAuthenticated || bookingState.userDetails?.email);
+  const canSubmitBooking = hasRequiredDocuments &&
+                          (isAuthenticated || bookingState.userDetails?.email) &&
+                          legalAccepted;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -335,6 +343,13 @@ export default function Payment() {
             </div>
           </div>
           
+          <LegalConsentCheckbox
+            id="checkout-legal-consent"
+            checked={legalAccepted}
+            onChange={setLegalAccepted}
+            className="mb-4"
+          />
+
           {/* Continue to Payment Button */}
           <button
             onClick={handlePaymentSubmit}
@@ -357,9 +372,11 @@ export default function Payment() {
           
           {!canSubmitBooking && !isProcessing && (
             <p className="text-sm text-gray-500 text-center mb-8">
-              {!hasRequiredDocuments 
+              {!hasRequiredDocuments
                 ? "Please upload all required documents to continue"
-                : "Please sign in to continue"
+                : !(isAuthenticated || bookingState.userDetails?.email)
+                  ? "Please sign in to continue"
+                  : "Please accept the Terms of Service and Privacy Policy to continue"
               }
             </p>
           )}
